@@ -7,21 +7,34 @@ use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
     asset::LoadState,
+    window::WindowMode,
 };
 
-
+#[bevy_main]
 fn main() {
-    App::new()
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            resizable: false,
+            mode: WindowMode::BorderlessFullscreen,
+            ..default()
+        }),
+        ..default()
+    }))
         .init_resource::<RpgSpriteHandles>()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
         .add_system(animate_sprite)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_startup_system(setup)
         .add_startup_system(ui_setup)
         .add_system(text_update_system)
         .add_system(text_color_system)
-        .add_system(button_system)
-        .run();
+        .add_systems(Update, touch_system)
+        .add_system(button_system);
+
+    #[cfg(target_os = "android")]
+    app.insert_resource(Msaa::Off);
+
+    app.run();
 }
 
 #[derive(Component)]
@@ -48,6 +61,19 @@ struct RpgSpriteHandles {
 }
 
 
+fn touch_system(mut commands: Commands, touches: Res<Touches>, rpg_sprite_handles: Res<RpgSpriteHandles>) {
+    for touch in touches.iter_just_pressed() {
+        info!(
+            "just pressed touch with id: {:?}, at: {:?}",
+            touch.id(),
+            touch.position()
+        );
+
+        let sprites = gen_animated_sprites(&rpg_sprite_handles, 1000);
+        commands.spawn_batch(sprites);
+    }
+}
+
 fn animate_sprite(
     time: Res<Time>,
     mut query: Query<(
@@ -73,7 +99,7 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
 
     let mut sprites = vec![];
     for i in 0..num {
-        let tex_handle = rpg_sprite_handles.gen_handles[2].clone();
+        let tex_handle = rpg_sprite_handles.gen_handles[1].clone();
         sprites.push((
             SpriteSheetBundle {
                 // texture_atlas: match rng.gen_range(0..3) {
@@ -84,7 +110,7 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
                 texture_atlas: tex_handle,
 
                 sprite: TextureAtlasSprite {
-                    index: rng.gen_range(1..20),
+                    index: rng.gen_range(1..6),
                     ..default()
                 },
                 transform: Transform {
@@ -94,7 +120,7 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
                 },
                 ..default()
             },
-            AnimationIndices { first: 1, last: 20 },
+            AnimationIndices { first: 1, last: 6 },
             AnimationTimer(Timer::from_seconds(rng.gen_range(0.1..0.3), TimerMode::Repeating)),
         ))
     }
@@ -202,19 +228,19 @@ fn ui_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         FpsText,
     ));
 
-    commands.spawn((
-        ButtonBundle {
-            style: Style {
-                width: Val::Px(150.0),
-                height: Val::Px(65.0),
-                position_type: PositionType::Absolute,
-                left: Val::Px(10.0),
-                bottom: Val::Px(10.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-    ));
+    // commands.spawn((
+    //     ButtonBundle {
+    //         style: Style {
+    //             width: Val::Px(150.0),
+    //             height: Val::Px(65.0),
+    //             position_type: PositionType::Absolute,
+    //             left: Val::Px(10.0),
+    //             bottom: Val::Px(10.0),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     },
+    // ));
 }
 
 fn button_system(
