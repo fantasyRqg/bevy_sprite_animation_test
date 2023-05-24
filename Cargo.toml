@@ -36,3 +36,7 @@ label = "Bevy Example"
 name = "android.hardware.vulkan.level"
 required = true
 version = 1
+
+[package.metadata.android.signing.release]
+path = "/Users/rqg/Playground/ProjectX/proj.android/key"
+keystore_password = "WhatPassword"

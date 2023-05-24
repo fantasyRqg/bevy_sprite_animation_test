@@ -99,7 +99,8 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
 
     let mut sprites = vec![];
     for i in 0..num {
-        let tex_handle = rpg_sprite_handles.gen_handles[1].clone();
+        let tex_handle = rpg_sprite_handles.gen_handles[2].clone();
+        let end_sprite_idx = 4 * 13 - 1;
         sprites.push((
             SpriteSheetBundle {
                 // texture_atlas: match rng.gen_range(0..3) {
@@ -110,7 +111,8 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
                 texture_atlas: tex_handle,
 
                 sprite: TextureAtlasSprite {
-                    index: rng.gen_range(1..6),
+                    index: rng.gen_range(1..end_sprite_idx),
+                    custom_size: Some(Vec2::new(176.0, 148.0) / 4.0),
                     ..default()
                 },
                 transform: Transform {
@@ -120,8 +122,9 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
                 },
                 ..default()
             },
-            AnimationIndices { first: 1, last: 6 },
+            AnimationIndices { first: 1, last: end_sprite_idx },
             AnimationTimer(Timer::from_seconds(rng.gen_range(0.1..0.3), TimerMode::Repeating)),
+            // AnimationTimer(Timer::from_seconds(1. / 30., TimerMode::Repeating)),
         ))
     }
 
