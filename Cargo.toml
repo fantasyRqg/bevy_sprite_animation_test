@@ -6,13 +6,22 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+sprite_test = { path = "crates/sprite_test" }
 bevy = { path = "/Users/rqg/Playground/bevy" }
 rand = "0.8.5"
 bytemuck = "1.7"
+serde = { version = "1.0.163", features = ["derive"] }
+plist = "1.6.0"
 
+[workspace]
+exclude = [
+]
+members = [
+    "crates/*",
+]
 
 [lib]
-name = "rust_sprite"
+name = "my_sprite"
 crate-type = ["staticlib", "cdylib"]
 
 [package.metadata.android.sdk]
@@ -40,3 +49,19 @@ version = 1
 [package.metadata.android.signing.release]
 path = "/Users/rqg/Playground/ProjectX/proj.android/key"
 keystore_password = "WhatPassword"
+
+[[example]]
+name = "sprite_mac"
+path = "examples/sprite_mac/main.rs"
+
+[[example]]
+name = "what_sprite"
+path = "examples/what_sprite/main.rs"
+
+[[example]]
+name = "plist_sprite"
+path = "examples/plist_sprite/main.rs"
+
+[[example]]
+name = "rust_beginner"
+path = "examples/rust_beginner/main.rs"
