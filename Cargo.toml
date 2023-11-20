@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sprite_test = { path = "crates/sprite_test" }
+swj = { path = "crates/swj" }
 bevy = { path = "/Users/rqg/Playground/bevy" }
 rand = "0.8.5"
 bytemuck = "1.7"

@@ -5,7 +5,7 @@ use bevy::{
     window::WindowMode,
 };
 
-use sprite_test::sprite_tt::SpriteTtPlugin;
+use swj::sprite_tt::SpriteTtPlugin;
 
 fn main() {
     App::new()

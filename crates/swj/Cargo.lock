@@ -2725,7 +2725,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sprite_test"
+name = "swj"
 version = "0.1.0"
 dependencies = [
  "bevy",
