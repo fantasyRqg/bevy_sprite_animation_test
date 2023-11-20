@@ -115,7 +115,7 @@ pub struct PlistSpriteAssetLoader {}
 
 
 #[derive(Debug)]
-struct SpriteFrame {
+pub struct SpriteFrame {
     name: String,
     frame: (f32, f32, f32, f32),
     offset: (f32, f32),
@@ -209,8 +209,8 @@ fn load_plist(dict: Value) -> (Vec<SpriteFrame>, String, Vec2) {
 
 #[derive(Asset, TypePath, Debug)]
 pub struct PlistSpriteFrameAsset {
-    frames: Vec<SpriteFrame>,
-    pub(crate) atlas: Handle<TextureAtlas>,
+    pub frames: Vec<SpriteFrame>,
+    pub atlas: Handle<TextureAtlas>,
 }
 
 #[non_exhaustive]
