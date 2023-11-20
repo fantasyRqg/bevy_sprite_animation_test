@@ -59,7 +59,7 @@ fn setup_unit_projectile(
     }
 
     let mut projectiles = Vec::with_capacity(1000);
-    for _ in 0..1 {
+    for _ in 0..1000 {
         let projectile = new_projectile(&projectile_info.info, &plist_sprite_frame_assets, &mut rng, hw, hh);
         projectiles.push(projectile);
     }
@@ -68,13 +68,18 @@ fn setup_unit_projectile(
     commands.spawn_batch(projectiles);
 }
 
-fn new_projectile(projectile_info: &ProjectileInfo, plist_sprite_frame_assets: &Res<Assets<PlistSpriteFrameAsset>>, rng: &mut ThreadRng, hw: f32, hh: f32) -> (SpriteSheetBundle, MoveElement, Projectile) {
+fn new_projectile(projectile_info: &ProjectileInfo, plist_sprite_frame_assets: &Res<Assets<PlistSpriteFrameAsset>>, rng: &mut ThreadRng, hw: f32, hh: f32) -> (SpriteSheetBundle, PlistAnimation, MoveElement, Projectile) {
     let ps = plist_sprite_frame_assets.get(projectile_info.plist_handle.id()).unwrap();
     let dir = Vec2::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)).normalize();
     let projectile = (
         SpriteSheetBundle {
             texture_atlas: ps.atlas.clone(),
             sprite: TextureAtlasSprite::new(rng.gen_range(0..ps.frames.len())),
+            ..default()
+        },
+        PlistAnimation {
+            timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
+            plist_frame: projectile_info.plist_handle.clone(),
             transform: Transform {
                 translation: Vec3::new(
                     rng.gen_range(-hw..hw),
@@ -84,19 +89,17 @@ fn new_projectile(projectile_info: &ProjectileInfo, plist_sprite_frame_assets: &
                 scale: Vec3::splat(0.5),
                 ..default()
             },
+            animated: false,
             ..default()
         },
-        // PlistAnimation {
-        //     timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
-        //     plist_frame: projectile_info.plist_handle.clone(),
-        //     ..default()
-        // },
         MoveElement {
             dir: dir,
             speed: rng.gen_range(1.0..5.0),
+            flippable: false,
         },
         Projectile {},
     );
+
     projectile
 }
 
@@ -107,6 +110,12 @@ fn new_unit(unit_infos: &Res<UnitInfoRes>, plist_sprite_frame_assets: &Res<Asset
         SpriteSheetBundle {
             texture_atlas: ps.atlas.clone(),
             sprite: TextureAtlasSprite::new(0),
+
+            ..default()
+        },
+        PlistAnimation {
+            timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
+            plist_frame: unit_info.1.plist_handle.clone(),
             transform: Transform::from_translation(Vec3::new(
                 rng.gen_range(-hw..hw),
                 rng.gen_range(-hh..hh),
@@ -114,14 +123,10 @@ fn new_unit(unit_infos: &Res<UnitInfoRes>, plist_sprite_frame_assets: &Res<Asset
             )),
             ..default()
         },
-        PlistAnimation {
-            timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
-            plist_frame: unit_info.1.plist_handle.clone(),
-            ..default()
-        },
         MoveElement {
             dir: Vec2::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)).normalize(),
             speed: rng.gen_range(1.0..5.0),
+            flippable: true,
         },
         Unit {},
     );
@@ -141,6 +146,7 @@ struct Projectile {}
 struct MoveElement {
     dir: Vec2,
     speed: f32,
+    flippable: bool,
 }
 
 
@@ -255,17 +261,20 @@ fn check_plist_load(
 
 fn move_sprite(
     window_size: Res<WindowSize>,
-    mut query: Query<(&mut Transform, &mut TextureAtlasSprite, &mut MoveElement)>,
+    mut query: Query<(&mut PlistAnimation, &mut TextureAtlasSprite, &mut MoveElement)>,
 ) {
-    for (mut transform, mut sprite, mut elm) in query.iter_mut() {
+    for (mut pa, mut sprite, mut elm) in query.iter_mut() {
         let dir = elm.dir;
         let speed = elm.speed;
+        let transform = &mut pa.transform;
         transform.translation += Vec3::new(dir.x * speed, dir.y * speed, 0.0);
 
-        if dir.x > 0.0 {
-            sprite.flip_x = false;
-        } else if dir.x < 0.0 {
-            sprite.flip_x = true;
+        if elm.flippable {
+            if dir.x > 0.0 {
+                sprite.flip_x = false;
+            } else if dir.x < 0.0 {
+                sprite.flip_x = true;
+            }
         }
 
         if transform.translation.x > window_size.0.x {
@@ -284,14 +293,11 @@ fn move_sprite(
 }
 
 fn projectile_point(
-    mut query: Query<(&mut Transform, &mut TextureAtlasSprite, &mut MoveElement), With<Projectile>>,
+    mut query: Query<(&mut PlistAnimation, &mut TextureAtlasSprite, &mut MoveElement), With<Projectile>>,
 ) {
-    for (mut transform, mut sprite, mut elm) in query.iter_mut() {
+    for (mut pa, mut sprite, mut elm) in query.iter_mut() {
         let dir = elm.dir;
-        let speed = elm.speed;
 
-
-        transform.rotation = Quat::from_rotation_z(-dir.angle_between(Vec2::X));
-        println!("rotation: {:?}", transform.rotation);
+        pa.transform.rotation = Quat::from_rotation_z(-dir.angle_between(Vec2::X));
     }
 }

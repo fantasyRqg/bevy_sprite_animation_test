@@ -1,6 +1,5 @@
-use std::f32::consts::{FRAC_2_PI, FRAC_PI_2};
-use std::f64::consts::FRAC_PI_4;
-use bevy::utils::{HashMap, thiserror};
+use std::f32::consts::{FRAC_PI_2};
+use bevy::utils::{thiserror};
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
@@ -8,7 +7,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use bevy::asset::{AsyncReadExt};
-use bevy::math::{vec2, vec3};
+use bevy::math::{vec3};
 use plist::Dictionary;
 
 use thiserror::Error;
@@ -46,8 +45,8 @@ impl Plugin for Cocos2dAnimPlugin {
 pub struct PlistAnimation {
     pub timer: Timer,
     pub plist_frame: Handle<PlistSpriteFrameAsset>,
-    pub last_rotated: f32,
-    pub last_offset: Vec2,
+    pub transform: Transform,
+    pub animated: bool,
 }
 
 impl Default for PlistAnimation {
@@ -55,8 +54,8 @@ impl Default for PlistAnimation {
         Self {
             timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
             plist_frame: Handle::default(),
-            last_rotated: 0.0,
-            last_offset: Vec2::new(0.0, 0.0),
+            transform: Transform::default(),
+            animated: true,
         }
     }
 }
@@ -70,29 +69,19 @@ fn update_sprite(
         let ps = plist_sprite.get(pa.plist_frame.id()).unwrap();
         let sf = &ps.frames[sprite.index];
 
-        transform.translation -= Vec3::from((pa.last_offset, 0.0));
-        if pa.last_rotated.abs() > 1e-3 {
-            transform.rotate_z(-pa.last_rotated);
-        }
+        *transform = pa.transform.clone();
 
         if sprite.flip_x {
             if sf.rotated {
-                pa.last_rotated = -FRAC_PI_2;
-            } else {
-                pa.last_rotated = 0.0;
+                // transform.rotate_local_z(-FRAC_PI_2);
             }
-            pa.last_offset = vec2(-sf.offset.0, sf.offset.1);
+            transform.translation += vec3(-sf.offset.0, sf.offset.1, 0.0);
         } else {
             if sf.rotated {
-                pa.last_rotated = FRAC_PI_2;
-            } else {
-                pa.last_rotated = 0.0;
+                // transform.rotate_local_z(FRAC_PI_2);
             }
-            pa.last_offset = vec2(sf.offset.0, sf.offset.1);
+            transform.translation += vec3(sf.offset.0, sf.offset.1, 0.0);
         }
-
-        transform.rotate_local_z(pa.last_rotated);
-        transform.translation += Vec3::from((pa.last_offset, 0.0));
     }
 }
 
@@ -102,6 +91,9 @@ fn animate_sprite(
     mut query: Query<(&mut TextureAtlasSprite, &mut PlistAnimation, &Handle<TextureAtlas>)>,
 ) {
     for (mut sprite, mut pa, tex) in &mut query {
+        if !pa.animated {
+            continue;
+        }
         pa.timer.tick(time.delta());
         if pa.timer.just_finished() {
             let tex = texture_atlas.get(tex).unwrap();
