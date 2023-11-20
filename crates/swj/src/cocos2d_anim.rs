@@ -1,3 +1,5 @@
+use std::f32::consts::{FRAC_2_PI, FRAC_PI_2};
+use std::f64::consts::FRAC_PI_4;
 use bevy::utils::{HashMap, thiserror};
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
@@ -6,6 +8,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use bevy::asset::{AsyncReadExt};
+use bevy::math::{vec2, vec3};
 use plist::Dictionary;
 
 use thiserror::Error;
@@ -15,10 +18,16 @@ use crate::game::GameStates;
 
 pub(crate) struct Cocos2dAnimPlugin;
 
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub(crate) enum CocosAnimSet {
+    Update,
+    AdjustSprite,
+}
 
 impl Plugin for Cocos2dAnimPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset::<PlistSpriteFrameAsset>()
+            .configure_sets(Update, (CocosAnimSet::Update, CocosAnimSet::AdjustSprite).chain())
             .init_asset_loader::<PlistSpriteAssetLoader>()
             .init_asset_loader::<PlistSpriteAssetLoader>()
             .add_systems(OnEnter(GameStates::Loading), load_sprites)
@@ -26,9 +35,9 @@ impl Plugin for Cocos2dAnimPlugin {
             .add_systems(Update,
                          (
                              (
-                                 animate_sprite,
-                                 update_sprite,
-                             ).chain(),
+                                 animate_sprite.in_set(CocosAnimSet::Update),
+                                 update_sprite.in_set(CocosAnimSet::AdjustSprite),
+                             ),
                          ).run_if(in_state(GameStates::Playing)),
             )
         ;
@@ -78,10 +87,10 @@ struct PlistSpriteCollection {
 }
 
 #[derive(Component)]
-struct PlistAnimation {
+pub(crate) struct PlistAnimation {
     timer: Timer,
     plist_frame: Handle<PlistSpriteFrameAsset>,
-    last_rotated: bool,
+    last_rotated: f32,
     last_offset: Vec2,
 }
 
@@ -90,7 +99,7 @@ impl Default for PlistAnimation {
         Self {
             timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
             plist_frame: Handle::default(),
-            last_rotated: false,
+            last_rotated: 0.0,
             last_offset: Vec2::new(0.0, 0.0),
         }
     }
@@ -103,20 +112,31 @@ fn update_sprite(
 ) {
     for (mut transform, sprite, mut pa) in &mut query {
         let ps = plist_sprite.get(pa.plist_frame.id()).unwrap();
-        let sf = &ps.frames[sprite.index as usize];
-        if sf.rotated {
-            if !pa.last_rotated {
-                transform.rotate_z(std::f32::consts::FRAC_PI_2);
-            }
-            transform.translation += Vec3::new(sf.offset.0 - pa.last_offset.x, sf.offset.1 - pa.last_offset.y, 0.0);
-        } else {
-            if pa.last_rotated {
-                transform.rotate_z(-std::f32::consts::FRAC_PI_2);
-            }
-            transform.translation += Vec3::new(sf.offset.0 - pa.last_offset.x, sf.offset.1 - pa.last_offset.y, 0.0);
+        let sf = &ps.frames[sprite.index];
+
+        transform.translation -= Vec3::from((pa.last_offset, 0.0));
+        if pa.last_rotated.abs() > 1e-3 {
+            transform.rotate_z(-pa.last_rotated);
         }
-        pa.last_rotated = sf.rotated;
-        pa.last_offset = Vec2::new(sf.offset.0, sf.offset.1);
+
+        if sprite.flip_x {
+            if sf.rotated {
+                pa.last_rotated = -FRAC_PI_2;
+            } else {
+                pa.last_rotated = 0.0;
+            }
+            pa.last_offset = vec2(-sf.offset.0, sf.offset.1);
+        } else {
+            if sf.rotated {
+                pa.last_rotated = FRAC_PI_2;
+            } else {
+                pa.last_rotated = 0.0;
+            }
+            pa.last_offset = vec2(sf.offset.0, sf.offset.1);
+        }
+
+        transform.rotate_local_z(pa.last_rotated);
+        transform.translation += Vec3::from((pa.last_offset, 0.0));
     }
 }
 
@@ -266,12 +286,12 @@ impl AssetLoader for PlistSpriteAssetLoader {
             for sf in sprite_frames.iter().by_ref() {
                 let rect = match sf.rotated {
                     true => Rect {
-                        min: Vec2::new(sf.frame.0 as f32, sf.frame.1 as f32),
-                        max: Vec2::new((sf.frame.0 + sf.frame.3) as f32, (sf.frame.1 + sf.frame.2) as f32),
+                        min: Vec2::new(sf.frame.0, sf.frame.1),
+                        max: Vec2::new((sf.frame.0 + sf.frame.3), (sf.frame.1 + sf.frame.2)),
                     },
                     false => Rect {
-                        min: Vec2::new(sf.frame.0 as f32, sf.frame.1 as f32),
-                        max: Vec2::new((sf.frame.0 + sf.frame.2) as f32, (sf.frame.1 + sf.frame.3) as f32),
+                        min: Vec2::new(sf.frame.0, sf.frame.1),
+                        max: Vec2::new((sf.frame.0 + sf.frame.2), (sf.frame.1 + sf.frame.3)),
                     },
                 };
                 atlas.add_texture(rect);
