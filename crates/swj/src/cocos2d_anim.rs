@@ -13,7 +13,6 @@ use plist::Dictionary;
 
 use thiserror::Error;
 use plist::Value;
-use crate::game::GameStates;
 
 
 pub(crate) struct Cocos2dAnimPlugin;
@@ -26,72 +25,29 @@ pub(crate) enum CocosAnimSet {
 
 impl Plugin for Cocos2dAnimPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<PlistSpriteFrameAsset>()
+        app
             .configure_sets(Update, (CocosAnimSet::Update, CocosAnimSet::AdjustSprite).chain())
+            .init_asset::<PlistSpriteFrameAsset>()
             .init_asset_loader::<PlistSpriteAssetLoader>()
-            .init_asset_loader::<PlistSpriteAssetLoader>()
-            .add_systems(OnEnter(GameStates::Loading), load_sprites)
-            .add_systems(Update, sprite_check_setup.run_if(in_state(GameStates::Loading)))
             .add_systems(Update,
                          (
                              (
                                  animate_sprite.in_set(CocosAnimSet::Update),
                                  update_sprite.in_set(CocosAnimSet::AdjustSprite),
                              ),
-                         ).run_if(in_state(GameStates::Playing)),
+                         ),
             )
         ;
     }
 }
 
-fn load_sprites(mut commands: Commands,
-                asset_server: Res<AssetServer>,
-) {
-    commands.insert_resource(PlistSpriteCollection {
-        plist_sprites: asset_server.load("textures/raw/archer_soldier.plist"),
-    });
-}
-
-fn sprite_check_setup(
-    mut commands: Commands,
-    mut events: EventReader<AssetEvent<PlistSpriteFrameAsset>>,
-    sprite_collection: Res<PlistSpriteCollection>,
-    plist_sprites: Res<Assets<PlistSpriteFrameAsset>>,
-    mut next_state: ResMut<NextState<GameStates>>,
-) {
-    for event in events.read() {
-        if event.is_loaded_with_dependencies(sprite_collection.plist_sprites.id()) {
-            let ps = plist_sprites.get(sprite_collection.plist_sprites.id()).unwrap();
-            commands.spawn((
-                SpriteSheetBundle {
-                    texture_atlas: ps.atlas.clone(),
-                    sprite: TextureAtlasSprite::new(0),
-                    ..default()
-                },
-                PlistAnimation {
-                    timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
-                    plist_frame: sprite_collection.plist_sprites.clone(),
-                    ..default()
-                },
-            ));
-
-            next_state.set(GameStates::Playing);
-        }
-    }
-}
-
-
-#[derive(Resource)]
-struct PlistSpriteCollection {
-    plist_sprites: Handle<PlistSpriteFrameAsset>,
-}
 
 #[derive(Component)]
-pub(crate) struct PlistAnimation {
-    timer: Timer,
-    plist_frame: Handle<PlistSpriteFrameAsset>,
-    last_rotated: f32,
-    last_offset: Vec2,
+pub struct PlistAnimation {
+    pub timer: Timer,
+    pub plist_frame: Handle<PlistSpriteFrameAsset>,
+    pub last_rotated: f32,
+    pub last_offset: Vec2,
 }
 
 impl Default for PlistAnimation {
@@ -254,7 +210,7 @@ fn load_plist(dict: Value) -> (Vec<SpriteFrame>, String, Vec2) {
 #[derive(Asset, TypePath, Debug)]
 pub struct PlistSpriteFrameAsset {
     frames: Vec<SpriteFrame>,
-    atlas: Handle<TextureAtlas>,
+    pub(crate) atlas: Handle<TextureAtlas>,
 }
 
 #[non_exhaustive]
