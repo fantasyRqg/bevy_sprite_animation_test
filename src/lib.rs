@@ -4,8 +4,7 @@ use bevy::{
     prelude::*,
     window::WindowMode,
 };
-
-use swj::sprite_tt::SpriteTtPlugin;
+use swj::game::GamePlugin;
 
 #[bevy_main]
 pub fn main() {
@@ -21,7 +20,8 @@ pub fn main() {
                 ..default()
             }
         ).set(ImagePlugin::default_nearest())
-    ).add_plugins(SpriteTtPlugin {});
+    )
+        .add_plugins(GamePlugin);
 
     #[cfg(target_os = "android")]
     app.insert_resource(Msaa::Off);

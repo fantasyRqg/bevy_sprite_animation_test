@@ -73,12 +73,12 @@ fn update_sprite(
 
         if sprite.flip_x {
             if sf.rotated {
-                // transform.rotate_local_z(-FRAC_PI_2);
+                transform.rotate_local_z(-FRAC_PI_2);
             }
             transform.translation += vec3(-sf.offset.0, sf.offset.1, 0.0);
         } else {
             if sf.rotated {
-                // transform.rotate_local_z(FRAC_PI_2);
+                transform.rotate_local_z(FRAC_PI_2);
             }
             transform.translation += vec3(sf.offset.0, sf.offset.1, 0.0);
         }

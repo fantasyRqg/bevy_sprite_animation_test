@@ -21,7 +21,7 @@ members = [
 ]
 
 [lib]
-name = "my_sprite"
+name = "rust_sprite"
 crate-type = ["staticlib", "cdylib"]
 
 [package.metadata.android.sdk]

@@ -2,6 +2,7 @@ use bevy::app::App;
 use bevy::prelude::*;
 use crate::cocos2d_anim::Cocos2dAnimPlugin;
 use crate::pf_controller::PfControllerPlugin;
+use crate::sprite_debug::SpriteDebugPlugin;
 
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 pub enum GameStates {
@@ -19,6 +20,7 @@ impl Plugin for GamePlugin {
             .add_plugins((
                 Cocos2dAnimPlugin,
                 PfControllerPlugin,
+                SpriteDebugPlugin,
             ))
 
             .add_systems(Startup, setup)

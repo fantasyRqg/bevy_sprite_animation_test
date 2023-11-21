@@ -12,6 +12,7 @@ pub(crate) struct PfControllerPlugin;
 impl Plugin for PfControllerPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_event::<SpawnEvent>()
             .insert_resource(UnitInfoRes::default())
             .insert_resource(ProjectileRes::default())
             .insert_resource(WindowSize(Vec2::new(0.0, 0.0)))
@@ -21,6 +22,7 @@ impl Plugin for PfControllerPlugin {
                              (
                                  move_sprite,
                                  projectile_point,
+                                 spawn_event,
                              ).in_set(CocosAnimSet::Update),
                              check_plist_load,
                          ),
@@ -64,7 +66,7 @@ fn setup_unit_projectile(
         projectiles.push(projectile);
     }
 
-    // commands.spawn_batch(units);
+    commands.spawn_batch(units);
     commands.spawn_batch(projectiles);
 }
 
@@ -116,11 +118,15 @@ fn new_unit(unit_infos: &Res<UnitInfoRes>, plist_sprite_frame_assets: &Res<Asset
         PlistAnimation {
             timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
             plist_frame: unit_info.1.plist_handle.clone(),
-            transform: Transform::from_translation(Vec3::new(
-                rng.gen_range(-hw..hw),
-                rng.gen_range(-hh..hh),
-                0.0,
-            )),
+            transform: Transform {
+                translation: Vec3::new(
+                    rng.gen_range(-hw..hw),
+                    rng.gen_range(-hh..hh),
+                    0.0,
+                ),
+                scale: Vec3::splat(0.5),
+                ..default()
+            },
             ..default()
         },
         MoveElement {
@@ -133,14 +139,14 @@ fn new_unit(unit_infos: &Res<UnitInfoRes>, plist_sprite_frame_assets: &Res<Asset
     unit
 }
 
-#[derive(Resource)]
+#[derive(Resource, Deref, DerefMut)]
 struct WindowSize(Vec2);
 
 #[derive(Component)]
-struct Unit {}
+pub struct Unit {}
 
 #[derive(Component)]
-struct Projectile {}
+pub struct Projectile {}
 
 #[derive(Component)]
 struct MoveElement {
@@ -299,5 +305,49 @@ fn projectile_point(
         let dir = elm.dir;
 
         pa.transform.rotation = Quat::from_rotation_z(-dir.angle_between(Vec2::X));
+    }
+}
+
+#[derive(Event)]
+pub enum SpawnEvent {
+    Unit(i32),
+    Projectile(i32),
+}
+
+fn spawn_event(
+    mut commands: Commands,
+    mut events: EventReader<SpawnEvent>,
+    unit_infos: Res<UnitInfoRes>,
+    projectile_info: Res<ProjectileRes>,
+    plist_sprite_frame_assets: Res<Assets<PlistSpriteFrameAsset>>,
+    window_size: Res<WindowSize>,
+) {
+    let hw = window_size.x;
+    let hh = window_size.y;
+
+    for event in events.iter() {
+        match event {
+            SpawnEvent::Unit(num) => {
+                let mut units = Vec::with_capacity(*num as usize);
+                let mut rng = rand::thread_rng();
+                for _ in 0..*num {
+                    let unit = new_unit(&unit_infos, &plist_sprite_frame_assets, &mut rng, hw, hh);
+
+                    units.push(unit);
+                }
+
+                commands.spawn_batch(units);
+            }
+            SpawnEvent::Projectile(num) => {
+                let mut projectiles = Vec::with_capacity(*num as usize);
+                let mut rng = rand::thread_rng();
+                for _ in 0..*num {
+                    let projectile = new_projectile(&projectile_info.info, &plist_sprite_frame_assets, &mut rng, hw, hh);
+                    projectiles.push(projectile);
+                }
+
+                commands.spawn_batch(projectiles);
+            }
+        }
     }
 }
