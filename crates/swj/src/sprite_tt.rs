@@ -1,10 +1,8 @@
-use std::ops::Deref;
+
 use rand::Rng;
 use bevy::{
-    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
+    diagnostic::{FrameTimeDiagnosticsPlugin},
     prelude::*,
-    asset::LoadState,
-    window::WindowMode,
 };
 use bevy::diagnostic::DiagnosticsStore;
 use bevy::ecs::query::BatchingStrategy;
@@ -173,7 +171,7 @@ fn gen_animated_sprites(rpg_sprite_handles: &Res<RpgSpriteHandles>, num: i32) ->
     let mut rng = rand::thread_rng();
 
     let mut sprites = vec![];
-    for i in 0..num {
+    for _i in 0..num {
         let tex_handle = rpg_sprite_handles.gen_handles[2].clone();
         let end_sprite_idx = 4 * 13 - 1;
         // let end_sprite_idx = 6;
@@ -229,7 +227,7 @@ fn setup(
     commands.spawn(Camera2dBundle::default());
 
 
-    let rpg_res = &Res::from(rpg_sprite_handles);
+    let _rpg_res = &Res::from(rpg_sprite_handles);
     // for _ in 0..1 {
     //     let sprites = gen_animated_sprites(rpg_res, 10000);
     //     commands.spawn_batch(sprites);
@@ -342,7 +340,7 @@ fn button_system(
     }
 }
 
-fn text_color_system(time: Res<Time>, mut query: Query<&mut Text, With<ColorText>>, sprites: Query<&TextureAtlasSprite>) {
+fn text_color_system(_time: Res<Time>, mut query: Query<&mut Text, With<ColorText>>, sprites: Query<&TextureAtlasSprite>) {
     for mut text in &mut query {
 
 

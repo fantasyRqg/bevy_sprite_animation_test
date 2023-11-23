@@ -8,7 +8,7 @@ pub struct SpriteSheetPlugin{
 
 
 impl Plugin for SpriteSheetPlugin  {
-    fn build(&self, app: &mut App) {
+    fn build(&self, _app: &mut App) {
 
     }
 }

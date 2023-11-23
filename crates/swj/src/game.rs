@@ -30,8 +30,8 @@ impl Plugin for GamePlugin {
 
 
 fn setup(mut commands: Commands,
-         asset_server: Res<AssetServer>,
-         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+         _asset_server: Res<AssetServer>,
+         _texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     commands.spawn(Camera2dBundle::default());
     // commands.spawn((

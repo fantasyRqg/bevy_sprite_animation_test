@@ -301,7 +301,7 @@ fn move_sprite(
 fn projectile_point(
     mut query: Query<(&mut PlistAnimation, &mut TextureAtlasSprite, &mut MoveElement), With<Projectile>>,
 ) {
-    for (mut pa, mut sprite, mut elm) in query.iter_mut() {
+    for (mut pa, _sprite, elm) in query.iter_mut() {
         let dir = elm.dir;
 
         pa.transform.rotation = Quat::from_rotation_z(-dir.angle_between(Vec2::X));
@@ -325,7 +325,7 @@ fn spawn_event(
     let hw = window_size.x;
     let hh = window_size.y;
 
-    for event in events.iter() {
+    for event in events.read() {
         match event {
             SpawnEvent::Unit(num) => {
                 let mut units = Vec::with_capacity(*num as usize);

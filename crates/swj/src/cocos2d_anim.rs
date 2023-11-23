@@ -65,7 +65,7 @@ fn update_sprite(
     mut query: Query<(&mut Transform, &TextureAtlasSprite, &mut PlistAnimation)>,
     plist_sprite: Res<Assets<PlistSpriteFrameAsset>>,
 ) {
-    for (mut transform, sprite, mut pa) in &mut query {
+    for (mut transform, sprite, pa) in &mut query {
         let ps = plist_sprite.get(pa.plist_frame.id()).unwrap();
         let sf = &ps.frames[sprite.index];
 
@@ -235,11 +235,11 @@ impl AssetLoader for PlistSpriteAssetLoader {
                 let rect = match sf.rotated {
                     true => Rect {
                         min: Vec2::new(sf.frame.0, sf.frame.1),
-                        max: Vec2::new((sf.frame.0 + sf.frame.3), (sf.frame.1 + sf.frame.2)),
+                        max: Vec2::new(sf.frame.0 + sf.frame.3, sf.frame.1 + sf.frame.2),
                     },
                     false => Rect {
                         min: Vec2::new(sf.frame.0, sf.frame.1),
-                        max: Vec2::new((sf.frame.0 + sf.frame.2), (sf.frame.1 + sf.frame.3)),
+                        max: Vec2::new(sf.frame.0 + sf.frame.2, sf.frame.1 + sf.frame.3),
                     },
                 };
                 atlas.add_texture(rect);

@@ -1,14 +1,30 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
+use bevy::winit::WinitSettings;
 
-fn main() {
+
+fn run_app() {
     App::new()
+        .insert_resource(WinitSettings {
+            return_from_run: true,
+            ..default()
+        })
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_systems(Startup, setup)
+        .add_systems(Update, quit)
         .run();
 }
 
+fn main() {
+    for _ in 0..3 {
+        run_app();
+        println!("run_app() returned");
+    }
+}
+
+
+fn quit() {}
 
 fn setup(mut commands: Commands,
          asset_server: Res<AssetServer>,

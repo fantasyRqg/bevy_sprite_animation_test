@@ -12,6 +12,8 @@ rand = "0.8.5"
 bytemuck = "1.7"
 serde = { version = "1.0.163", features = ["derive"] }
 plist = "1.6.0"
+winit = "0.28.7"
+raw-window-handle="0.5.2"
 
 [workspace]
 exclude = [
@@ -65,3 +67,8 @@ path = "examples/plist_sprite/main.rs"
 [[example]]
 name = "rust_beginner"
 path = "examples/rust_beginner/main.rs"
+
+[[example]]
+name = "my_winit"
+path = "examples/my_winit/main.rs"
+
