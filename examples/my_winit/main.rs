@@ -47,5 +47,12 @@ fn main() {
         .add_plugins(GamePlugin)
         // .add_systems(Startup, setup_system)
         // .add_systems(Update, move_system)
+        .add_systems(Update, debug_system)
         .run();
+}
+
+fn debug_system(
+    ui_scale: Res<UiScale>
+) {
+    // println!("ui_scale: {:?}", ui_scale.0);
 }

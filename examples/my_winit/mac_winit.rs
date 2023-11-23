@@ -116,6 +116,8 @@ fn my_runner(mut app: App) {
     let mut app_exit_event_reader = ManualEventReader::<AppExit>::default();
 
     event_loop.run_return(|event, event_loop, control_flow| {
+        // println!("event: {:?}", event);
+
         if app.plugins_state() != PluginsState::Cleaned {
             if app.plugins_state() != PluginsState::Ready {
                 tick_global_task_pools_on_main_thread();
@@ -161,6 +163,17 @@ fn my_runner(mut app: App) {
 
                 let mut window = windows.get_mut(window_entity).unwrap();
                 match event {
+                    WindowEvent::Resized(size) => {
+                        window
+                            .resolution
+                            .set_physical_resolution(size.width, size.height);
+
+                        event_writers.window_resized.send(WindowResized {
+                            window: window_entity,
+                            width: window.width(),
+                            height: window.height(),
+                        });
+                    }
                     WindowEvent::Focused(focused) => {
                         window.focused = focused;
                         winit_windows.app_should_run = focused;
@@ -258,6 +271,7 @@ fn create_windows<'a>(
     let (win_entity, mut window) = created_windows.next().unwrap();
 
     let logical_size = LogicalSize::new(window.width(), window.height());
+    println!("logical_size: {:?}", logical_size);
 
     let mut window_builder = if let Some(sf) = window.resolution.scale_factor_override() {
         window_builder.with_inner_size(logical_size.to_physical::<f64>(sf))
