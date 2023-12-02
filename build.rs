@@ -2,7 +2,7 @@ use std::{env, path::{Path, PathBuf}};
 
 fn main() {
     if env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
-        android();
+        // android();
     }
 }
 

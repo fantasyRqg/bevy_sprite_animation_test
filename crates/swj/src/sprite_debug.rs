@@ -145,7 +145,7 @@ fn setup_ui(
                     parent.spawn(TextBundle::from_section(
                         "Remove All",
                         TextStyle {
-                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                             font_size: 20.0,
                             color: Color::rgb(0.2, 0.1, 0.1),
                         },
@@ -174,7 +174,7 @@ fn setup_ui(
                     parent.spawn(TextBundle::from_section(
                         "Add Unit +500",
                         TextStyle {
-                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                             font_size: 20.0,
                             color: Color::rgb(0.2, 0.1, 0.1),
                         },
@@ -203,7 +203,7 @@ fn setup_ui(
                     parent.spawn(TextBundle::from_section(
                         "Add Projectile +500",
                         TextStyle {
-                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                             font_size: 20.0,
                             color: Color::rgb(0.2, 0.1, 0.1),
                         },
@@ -246,7 +246,7 @@ fn btn_reset_game(
             commands.entity(entity).despawn_recursive();
         }
 
-        app_exit_events.send(AppExit);
+        // app_exit_events.send(AppExit);
     }
 }
 

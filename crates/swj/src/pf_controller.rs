@@ -3,7 +3,7 @@ use std::path::Path;
 use bevy::prelude::*;
 use rand::prelude::ThreadRng;
 use rand::Rng;
-use crate::cocos2d_anim::{CocosAnimSet, PlistSpriteFrameAsset};
+use crate::cocos2d_anim::{CocosAnimSet, sprite_sheet::PlistSpriteFrameAsset};
 use crate::cocos2d_anim::PlistAnimation;
 use crate::game::GameStates;
 

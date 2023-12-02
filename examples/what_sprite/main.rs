@@ -48,6 +48,11 @@ fn setup(mut commands: Commands,
     commands.spawn(SpriteSheetBundle {
         texture_atlas: tex_handle.clone(),
         // transform: Transform::from_scale(Vec3::splat(0.5)),
+        sprite: TextureAtlasSprite {
+            index: 0,
+            color: Color::rgba(1.0, 1.0, 1.0, 0.2),
+            ..default()
+        },
         ..default()
     });
 
@@ -55,7 +60,7 @@ fn setup(mut commands: Commands,
         texture_atlas: tex_handle.clone(),
         transform: Transform {
             translation: Vec3::new(-80.0, 0.0, 0.0),
-            scale: Vec3::splat(0.5),
+            scale: Vec3::new(2.0, 1.0, 1.0),
             ..default()
         },
         ..default()

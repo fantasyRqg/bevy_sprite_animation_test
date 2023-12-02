@@ -7,7 +7,12 @@ use bevy::{
 use bevy::winit::{WinitSettings, WinitWindows};
 use swj::game::GamePlugin;
 
-#[bevy_main]
+
+#[no_mangle]
+pub extern "C" fn rust_function() {
+    info!("rust_function");
+}
+
 pub fn main() {
     let mut app = App::new();
     app

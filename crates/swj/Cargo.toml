@@ -10,3 +10,4 @@ bevy = { path = "/Users/rqg/Playground/bevy" }
 rand = "0.8.5"
 bytemuck = "1.7"
 plist = "1.6.0"
+serde_json = "1.0.108"
