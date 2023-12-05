@@ -65,7 +65,7 @@ fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Deref, DerefMut)]
 struct AnimButton(String);
 
 fn spawn_anim(
@@ -78,7 +78,7 @@ fn spawn_anim(
         Cocos2dAnimator {
             duration: None,
             anim_handle: anim_data.anim.clone(),
-            action_name: "hit2".to_string(),
+            new_anim: Some("hit2".to_string()),
             mode: AnimationMode::Loop,
             event_channel: Some(0),
         },
@@ -151,7 +151,7 @@ fn btn_system(
     for (interaction, anim_btn) in btn_query.iter() {
         if matches!(interaction,Interaction::Pressed) {
             for mut anim in anim_query.iter_mut() {
-                anim.action_name = anim_btn.0.clone();
+                anim.switch_anim(anim_btn);
             }
         }
     }

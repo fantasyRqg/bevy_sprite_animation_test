@@ -55,9 +55,15 @@ pub enum AnimationMode {
 pub struct Cocos2dAnimator {
     pub duration: Option<Duration>,
     pub anim_handle: Handle<Cocos2dAnimAsset>,
-    pub action_name: String,
+    pub new_anim: Option<String>,
     pub mode: AnimationMode,
     pub event_channel: Option<usize>,
+}
+
+impl Cocos2dAnimator {
+    pub fn switch_anim(&mut self, name: &str) {
+        self.new_anim = Some(name.to_string());
+    }
 }
 
 #[derive(Debug)]
@@ -70,6 +76,7 @@ enum AnimationState {
 struct Cocos2dAnimatorInner {
     frame_idx: usize,
     timer: Timer,
+    anim_name: String,
     state: AnimationState,
 }
 
@@ -101,7 +108,12 @@ fn spawn_anim(
 ) {
     for (entity, cfg) in &mut query.iter() {
         let animation = animations.get(cfg.anim_handle.clone()).unwrap();
-        let anim_name = cfg.action_name.clone();
+        let anim_name = if let Some(name) = &cfg.new_anim {
+            name.clone()
+        } else {
+            warn!("anim name is empty, nothing to play. Set anim name in Cocos2dAnimator component.");
+            continue;
+        };
         if anim_name.is_empty() || !animation.animation.contains_key(&anim_name) {
             commands.entity(entity).despawn();
             warn!("anim {} not found.", anim_name,);
@@ -119,6 +131,7 @@ fn spawn_anim(
             frame_idx: usize::MAX,
             timer: Timer::from_seconds(interval, Repeating),
             state: AnimationState::Playing,
+            anim_name,
         })
             .with_children(|parent| {
                 for (name, _) in &animation.layers {
@@ -139,12 +152,19 @@ fn spawn_anim(
 fn animate_sprite(
     time: Res<Time>,
     animations: Res<Assets<Cocos2dAnimAsset>>,
-    mut query: Query<(&Cocos2dAnimator, &mut Cocos2dAnimatorInner, &Children, Entity)>,
+    mut query: Query<(&mut Cocos2dAnimator, &mut Cocos2dAnimatorInner, &Children, Entity)>,
     mut child_query: Query<(&mut TextureAtlasSprite, &mut CocoAnim2dAnimatorLayer, &mut Handle<TextureAtlas>, &mut Transform)>,
     mut events: EventWriter<AnimEvent>,
 ) {
-    for (cfg, mut animator, children, entity) in &mut query {
+    for (mut cfg, mut animator, children, entity) in &mut query {
         // info!("animate_sprite: {:?}, interval: {}", animator.state, animator.timer.duration().as_secs_f32());
+        if let Some(anim_name) = &cfg.new_anim {
+            animator.frame_idx = usize::MAX;
+            animator.state = AnimationState::Playing;
+            animator.anim_name = anim_name.clone();
+            cfg.new_anim = None;
+        }
+
         if matches!(animator.state,Ended) {
             continue;
         }
@@ -157,13 +177,12 @@ fn animate_sprite(
         // info!("animate_sprite: {}", animator.frame_idx);
 
         let animation = animations.get(cfg.anim_handle.clone()).unwrap();
-        let animation = &animation.animation[&cfg.action_name];
+        let animation = &animation.animation[&animator.anim_name];
 
 
         if animator.frame_idx == usize::MAX {
             animator.frame_idx = 0;
-        }
-        if animator.frame_idx + 1 >= animation.frame_size {
+        } else if animator.frame_idx + 1 >= animation.frame_size {
             match cfg.mode {
                 AnimationMode::Once => {
                     animator.state = Ended;
@@ -187,6 +206,8 @@ fn animate_sprite(
                 events.send(evt);
             }
         }
+
+        // info!("animate_sprite: {}, frame size: {}, name: {}", animator.frame_idx,animation.frame_size,animator.anim_name);
 
         if matches!(animator.state,Ended) {
             continue;
@@ -234,7 +255,6 @@ fn animate_sprite(
 
             *atlas = frame.sprite_atlas.clone();
 
-            // *transform = Transform::IDENTITY;
             if sprite.flip_x {
                 if frame.rotated {
                     transform.rotation = Quat::from_rotation_z(-FRAC_PI_2);
