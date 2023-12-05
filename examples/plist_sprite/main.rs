@@ -24,6 +24,7 @@ fn main() {
             debug_plist,
             debug_anchor,
             btn_system,
+            file_drag_and_drop_system,
         ))
         .add_systems(OnEnter(GameStates::Playing), spawn_anim)
         .run();
@@ -50,7 +51,7 @@ fn setup(
     mut anim_data: ResMut<AnimDataRes>,
 ) {
     commands.spawn(Camera2dBundle::default());
-    anim_data.anim = asset_server.load("anim/barbarian_boss.ExportJson");
+    anim_data.anim = asset_server.load("anim/barbarian_archer.ExportJson");
 }
 
 fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
@@ -67,6 +68,9 @@ fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimButton(String);
+
+#[derive(Component)]
+struct RemovableElm;
 
 fn spawn_anim(
     mut commands: Commands,
@@ -86,6 +90,7 @@ fn spawn_anim(
             transform: Transform::from_translation(Vec3::new(10.0, 10.0, 0.0)),
             ..default()
         },
+        RemovableElm
     ))
         .with_children(|parent| {
             // parent.spawn(
@@ -103,18 +108,21 @@ fn spawn_anim(
 
     let animation = &animations.get(&anim_data.anim).unwrap().animation;
 
-    commands.spawn(NodeBundle {
-        style: Style {
-            left: Val::Px(10.0),
-            top: Val::Px(10.0),
-            flex_direction: Column,
-            align_items: Center,
-            justify_content: JustifyContent::Center,
-            column_gap: Val::Px(10.0),
+    commands.spawn((
+        NodeBundle {
+            style: Style {
+                left: Val::Px(10.0),
+                top: Val::Px(10.0),
+                flex_direction: Column,
+                align_items: Center,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(10.0),
+                ..default()
+            },
             ..default()
         },
-        ..default()
-    }).with_children(|parent| {
+        RemovableElm
+    )).with_children(|parent| {
         for (name, _) in animation.iter() {
             parent.spawn((
                 ButtonBundle {
@@ -172,7 +180,7 @@ fn debug_plist(
     animation: Res<Assets<Cocos2dAnimAsset>>,
 ) {
     // for atlas in texture_atlas.iter() {
-    //     info!("Atlas: {:?}", atlas.0);
+    //     info!("Atlas: {:?}", atlas.1.texture);
     // }
     //
     // for sheet in sprite_sheet.iter() {
@@ -189,4 +197,30 @@ fn debug_anchor(
 ) {
     gizmos.line_2d(vec2(-10.0, 0.0), vec2(10.0, 0.0), Color::RED);
     gizmos.line_2d(vec2(0.0, -10.0), vec2(0.0, 10.0), Color::RED);
+
+
+    gizmos.rect_2d(Vec2::ZERO, 0.0, vec2(600.0, 600.0), Color::BLUE);
+}
+
+
+fn file_drag_and_drop_system(
+    mut commands: Commands,
+    mut events: EventReader<FileDragAndDrop>,
+    asset_server: Res<AssetServer>,
+    mut anim_data: ResMut<AnimDataRes>,
+    mut game_state: ResMut<NextState<GameStates>>,
+    mut rm_query: Query<Entity, With<RemovableElm>>,
+) {
+    for event in events.read() {
+        if let FileDragAndDrop::DroppedFile { window, path_buf } = event {
+            for re in rm_query.iter_mut() {
+                commands.entity(re).despawn_recursive();
+            }
+
+            anim_data.anim = asset_server.load(path_buf.to_str().unwrap().to_string());
+            game_state.set(GameStates::Loading);
+
+            break;
+        }
+    }
 }
