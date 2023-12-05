@@ -26,7 +26,7 @@ pub struct SpriteFrame {
 
 fn parse_frame_from_plist(frame_attr: &Dictionary, frame_name: &str) -> SpriteFrame {
     let mut sf = SpriteFrame {
-        name: frame_name.to_string(),
+        name: frame_name.to_string().replace(".png", ""),
         frame: (0.0f32, 0.0f32, 0.0f32, 0.0f32),
         offset: (0.0f32, 0.0f32),
         rotated: false,
@@ -118,7 +118,7 @@ pub struct PlistSpriteFrameAsset {
 #[derive(Debug, Error)]
 pub enum PlistSpriteAssetLoaderError {
     /// An [IO](std::io) Error
-    #[error("Could load shader: {0}")]
+    #[error("Could load asset: {0}")]
     Io(#[from] std::io::Error),
 }
 

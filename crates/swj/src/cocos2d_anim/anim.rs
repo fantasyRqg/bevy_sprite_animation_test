@@ -5,6 +5,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use bevy::asset::{AssetContainer, AsyncReadExt};
+use bevy::math::vec2;
 use bevy::utils::{HashMap, thiserror};
 use serde_json::Value;
 use thiserror::Error;
@@ -39,7 +40,7 @@ struct MoveBoneFrameData {
 }
 
 struct MoveBoneData {
-    frames: HashMap<String, Vec<MoveBoneFrameData>>,
+    layers: HashMap<String, Vec<MoveBoneFrameData>>,
     interval: f32,
     frame_size: usize,
 }
@@ -48,28 +49,49 @@ struct MoveBoneData {
 #[derive(Default)]
 pub struct Cocos2dAnimAssetLoader;
 
+#[derive(Debug)]
+pub struct Cocos2dAnimFrame {
+    pub translate: Vec3,
+    pub scale: Vec2,
+    pub rotated: bool,
+
+    pub evt: Option<String>,
+    pub color: Option<Color>,
+
+    pub fi: usize,
+
+    pub sprite_atlas: Handle<TextureAtlas>,
+    pub sprite_idx: usize,
+}
+
+#[derive(Debug)]
+pub struct Cocos2dAnimMove {
+    pub interval: f32,
+    pub frame_size: usize,
+    pub layers: HashMap<String, Vec<Cocos2dAnimFrame>>,
+}
 
 #[derive(Asset, TypePath, Debug)]
-pub struct CocosAnim2dAsset {
-    // pub frames: Vec<SpriteFrame>,
-    // pub atlas: Handle<TextureAtlas>,
+pub struct Cocos2dAnimAsset {
+    pub animation: HashMap<String, Cocos2dAnimMove>,
+    plist_handles: Vec<Handle<PlistSpriteFrameAsset>>,
 }
 
 #[non_exhaustive]
 #[derive(Debug, Error)]
-pub enum CocosAnim2dLoaderError {
+pub enum Cocos2dAnimLoaderError {
     /// An [IO](std::io) Error
-    #[error("Could load shader: {0}")]
+    #[error("Could load asset: {0}")]
     Io(#[from] std::io::Error),
 }
 
 impl AssetLoader for Cocos2dAnimAssetLoader {
-    type Asset = CocosAnim2dAsset;
+    type Asset = Cocos2dAnimAsset;
     type Settings = ();
-    type Error = CocosAnim2dLoaderError;
+    type Error = Cocos2dAnimLoaderError;
 
     fn load<'a>(&'a self, reader: &'a mut Reader,
-                settings: &'a Self::Settings,
+                _settings: &'a Self::Settings,
                 load_context: &'a mut LoadContext)
                 -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
@@ -84,12 +106,19 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                 .collect::<Vec<String>>();
 
             let mut plist_file_data: HashMap<String, PlistSpriteFrameAsset> = HashMap::new();
-            for plist_file_name in plist_file_names {
+            let mut plist_handles = Vec::new();
+            for plist_file_name in plist_file_names.iter() {
                 let sprite_sheet = load_context.load_direct(
                     load_context.path().parent().unwrap().join(plist_file_name.clone()),
                 ).await.unwrap();
+
                 let sprite_sheet = sprite_sheet.get::<PlistSpriteFrameAsset>().unwrap();
-                plist_file_data.insert(plist_file_name, sprite_sheet.clone());
+                plist_file_data.insert(plist_file_name.clone(), sprite_sheet.clone());
+            }
+
+            for plist_file_name in plist_file_names.iter() {
+                let handle = load_context.load(load_context.path().parent().unwrap().join(plist_file_name.clone()));
+                plist_handles.push(handle);
             }
 
 
@@ -159,11 +188,144 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
             }
 
 
-            Ok(CocosAnim2dAsset {})
+            let mut move_bone_data = HashMap::new();
+
+            for mbd in anim_data["animation_data"].as_array().unwrap().first().unwrap()["mov_data"].as_array().unwrap() {
+                let mbd = mbd.as_object().unwrap();
+                let name = mbd["name"].as_str().unwrap().to_string();
+                let interval = mbd["sc"].as_f64().unwrap() as f32;
+                let interval = interval * 60.0;
+                let interval = 1.0 / interval * 2.0;
+                let frame_size = mbd["dr"].as_f64().unwrap() as usize + 1;
+                let mut layers = HashMap::new();
+
+                for layer in mbd["mov_bone_data"].as_array().unwrap() {
+                    let layer = layer.as_object().unwrap();
+                    let name = layer["name"].as_str().unwrap().to_string();
+                    let mut layer_data = Vec::new();
+
+                    for frame in layer["frame_data"].as_array().unwrap() {
+                        let frame = frame.as_object().unwrap();
+                        let di = frame["dI"].as_f64().unwrap() as usize;
+                        let fi = frame["fi"].as_f64().unwrap() as usize;
+                        let translate = Vec3::new(
+                            frame["x"].as_f64().unwrap() as f32,
+                            frame["y"].as_f64().unwrap() as f32,
+                            frame["z"].as_f64().unwrap() as f32,
+                        );
+                        let scale = Vec2::new(
+                            frame["cX"].as_f64().unwrap() as f32,
+                            frame["cY"].as_f64().unwrap() as f32,
+                        );
+                        let evt = if let Some(evt) = frame.get("evt") {
+                            evt.as_str().map(|s| s.to_string())
+                        } else {
+                            None
+                        };
+                        let color = if let Some(color) = frame.get("color") {
+                            color.as_object().map(|a| {
+                                Color::rgba(
+                                    a["a"].as_f64().unwrap() as f32 / 255.0,
+                                    a["r"].as_f64().unwrap() as f32 / 255.0,
+                                    a["g"].as_f64().unwrap() as f32 / 255.0,
+                                    a["b"].as_f64().unwrap() as f32 / 255.0,
+                                )
+                            })
+                        } else {
+                            None
+                        };
+
+
+                        layer_data.push(MoveBoneFrameData {
+                            translate,
+                            scale,
+                            evt,
+                            color,
+                            di,
+                            fi,
+                        });
+                    }
+
+                    layers.insert(name, layer_data);
+                }
+
+                let data = MoveBoneData {
+                    layers,
+                    interval,
+                    frame_size,
+                };
+
+                move_bone_data.insert(name, data);
+            }
+
+
+            let mut animation = HashMap::new();
+
+            for (name, mbd) in move_bone_data {
+                let mut layer_map = HashMap::new();
+
+                for (layer_name, layer_data) in mbd.layers {
+                    let mut frames = Vec::new();
+
+                    for frame_data in layer_data {
+                        let bd = &bone_data[&layer_name];
+                        let dd = &bd.display_data[frame_data.di];
+                        let tex_data = &texture_data[&dd.name];
+                        let sprite_sheet = &plist_file_data[&tex_data.plist_file];
+                        let sprite_idx = sprite_sheet.frames.iter().position(|sf| sf.name == dd.name).unwrap();
+                        let sprite_frame = &sprite_sheet.frames[sprite_idx];
+                        let mut offset = Vec2::from(sprite_frame.offset);
+
+                        let frame_size = Vec2::from(sprite_frame.source_size);
+                        let frame_center = frame_size / 2.0;
+                        let anchor = frame_size * vec2(tex_data.px, tex_data.py);
+                        offset = offset - (anchor - frame_center);
+
+                        let mut translate = offset.extend(0.0);
+                        translate += dd.xy.extend(0.0);
+                        translate += bd.translate;
+                        translate += frame_data.translate;
+
+                        let mut scale = bd.scale;
+                        scale *= dd.scale;
+                        scale *= frame_data.scale;
+
+
+                        let frame = Cocos2dAnimFrame {
+                            translate,
+                            scale,
+                            rotated: sprite_frame.rotated,
+                            evt: frame_data.evt,
+                            color: frame_data.color,
+                            fi: frame_data.fi,
+                            sprite_atlas: sprite_sheet.atlas.clone(),
+                            sprite_idx,
+                        };
+
+                        frames.push(frame);
+                    }
+
+                    layer_map.insert(layer_name, frames);
+                }
+
+                let data = Cocos2dAnimMove {
+                    interval: mbd.interval,
+                    frame_size: mbd.frame_size,
+                    layers: layer_map,
+                };
+
+                animation.insert(name, data);
+            }
+
+
+            Ok(Cocos2dAnimAsset {
+                animation,
+                plist_handles,
+            })
         })
     }
 
     fn extensions(&self) -> &[&str] {
-        &["ExportJson"]
+        &["exportjson"]
     }
 }
