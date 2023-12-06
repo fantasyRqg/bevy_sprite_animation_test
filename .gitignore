@@ -1,2 +1,4 @@
 /target
 .idea
+assets/Resources
+Cargo.lock

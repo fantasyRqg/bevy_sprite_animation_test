@@ -51,7 +51,7 @@ fn setup(
     mut anim_data: ResMut<AnimDataRes>,
 ) {
     commands.spawn(Camera2dBundle::default());
-    anim_data.anim = asset_server.load("anim/barbarian_archer.ExportJson");
+    anim_data.anim = asset_server.load("Resources/Animations/archer_soldier.ExportJson");
 }
 
 fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
@@ -82,28 +82,19 @@ fn spawn_anim(
         Cocos2dAnimator {
             duration: None,
             anim_handle: anim_data.anim.clone(),
-            new_anim: Some("hit2".to_string()),
+            new_anim: Some("run".to_string()),
             mode: AnimationMode::Loop,
             event_channel: Some(0),
         },
         SpatialBundle {
-            transform: Transform::from_translation(Vec3::new(10.0, 10.0, 0.0)),
+            transform: Transform {
+                // scale: Vec3::splat(3.5),
+                ..default()
+            },
             ..default()
         },
         RemovableElm
-    ))
-        .with_children(|parent| {
-            // parent.spawn(
-            //     SpriteBundle {
-            //         sprite: Sprite {
-            //             custom_size: Some(Vec2::new(100.0, 100.0)),
-            //             color: Color::RED,
-            //             ..default()
-            //         },
-            //         ..default()
-            //     }
-            // );
-        });
+    ));
 
 
     let animation = &animations.get(&anim_data.anim).unwrap().animation;
@@ -197,9 +188,6 @@ fn debug_anchor(
 ) {
     gizmos.line_2d(vec2(-10.0, 0.0), vec2(10.0, 0.0), Color::RED);
     gizmos.line_2d(vec2(0.0, -10.0), vec2(0.0, 10.0), Color::RED);
-
-
-    gizmos.rect_2d(Vec2::ZERO, 0.0, vec2(600.0, 600.0), Color::BLUE);
 }
 
 

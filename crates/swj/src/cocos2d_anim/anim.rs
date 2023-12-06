@@ -279,11 +279,8 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                         let frame_size = Vec2::from(sprite_frame.source_size);
                         let frame_center = frame_size / 2.0;
                         let anchor = frame_size * vec2(tex_data.px, tex_data.py);
-                        info!("px: {}, py:{}  --- frame_size: {:?}, anchor:{:?}",tex_data.px,tex_data.py,frame_size,anchor);
-                        info!("++ offset: {:?}",offset);
+                        let anchor = anchor.round();
                         offset = offset - (anchor - frame_center);
-                        // offset = offset - ( anchor);
-                        info!("-- offset: {:?}",offset);
 
 
                         let mut translate = offset.extend(0.0);
