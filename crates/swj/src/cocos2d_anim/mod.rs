@@ -50,6 +50,10 @@ pub enum AnimationMode {
     Loop,
 }
 
+pub enum AnimationFaceDir {
+    Left,
+    Right,
+}
 
 #[derive(Component)]
 pub struct Cocos2dAnimator {
@@ -58,6 +62,7 @@ pub struct Cocos2dAnimator {
     pub new_anim: Option<String>,
     pub mode: AnimationMode,
     pub event_channel: Option<usize>,
+    pub face_dir: AnimationFaceDir,
 }
 
 impl Cocos2dAnimator {
@@ -116,7 +121,7 @@ fn spawn_anim(
         };
         if anim_name.is_empty() || !animation.animation.contains_key(&anim_name) {
             commands.entity(entity).despawn();
-            warn!("anim {} not found.", anim_name,);
+            warn!("In {:?} animation, anim {} not found.",cfg.anim_handle, anim_name);
             continue;
         }
 
@@ -252,8 +257,12 @@ fn animate_sprite(
             } else {
                 Color::WHITE
             };
-
             *atlas = frame.sprite_atlas.clone();
+
+            sprite.flip_x = match cfg.face_dir {
+                AnimationFaceDir::Left => true,
+                AnimationFaceDir::Right => false,
+            };
 
             if sprite.flip_x {
                 if frame.rotated {
@@ -272,8 +281,10 @@ fn animate_sprite(
                 }
 
                 transform.translation = frame.translate;
-                transform.scale = frame.scale.extend(0.0);
+                transform.scale = frame.scale.extend(1.0);
             }
+
+            // info!("layer {} set frame: {:?}, transform: {:?}",layer.name, frame,*transform);
 
 
             if let Some(evt) = &frame.evt {

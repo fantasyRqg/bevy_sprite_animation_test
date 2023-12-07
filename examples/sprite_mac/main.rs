@@ -2,15 +2,14 @@
 
 use bevy::{
     prelude::*,
-    window::WindowMode,
 };
 
-use swj::sprite_tt::SpriteTtPlugin;
+use swj::game::GamePlugin;
 
 fn main() {
     App::new()
         .add_plugins(
             DefaultPlugins.set(ImagePlugin::default_nearest())
-        ).add_plugins(SpriteTtPlugin {})
+        ).add_plugins(GamePlugin)
         .run();
 }

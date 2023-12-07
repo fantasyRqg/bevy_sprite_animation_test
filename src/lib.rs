@@ -4,15 +4,11 @@ use bevy::{
     prelude::*,
     window::WindowMode,
 };
-use bevy::winit::{WinitSettings, WinitWindows};
+use bevy::winit::WinitSettings;
+
 use swj::game::GamePlugin;
 
-
-#[no_mangle]
-pub extern "C" fn rust_function() {
-    info!("rust_function");
-}
-
+#[bevy_main]
 pub fn main() {
     let mut app = App::new();
     app

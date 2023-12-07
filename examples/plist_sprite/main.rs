@@ -3,18 +3,25 @@
 use bevy::{
     prelude::*,
 };
+use bevy::log::LogPlugin;
 use bevy::math::vec2;
 use bevy::ui::AlignItems::Center;
 use bevy::ui::FlexDirection::Column;
 
-use swj::cocos2d_anim::{AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimPlugin};
+use swj::cocos2d_anim::{AnimationFaceDir, AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimPlugin};
 use swj::cocos2d_anim::anim::Cocos2dAnimAsset;
 use swj::cocos2d_anim::sprite_sheet::PlistSpriteFrameAsset;
 
 fn main() {
     App::new()
         .add_state::<GameStates>()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(DefaultPlugins
+            .set(ImagePlugin::default_nearest())
+            // .set(LogPlugin {
+            //     level: bevy::log::Level::DEBUG,
+            //     ..default()
+            // })
+        )
         .add_plugins(Cocos2dAnimPlugin)
         .init_resource::<AnimDataRes>()
         .add_systems(Startup, setup)
@@ -51,7 +58,7 @@ fn setup(
     mut anim_data: ResMut<AnimDataRes>,
 ) {
     commands.spawn(Camera2dBundle::default());
-    anim_data.anim = asset_server.load("Resources/Animations/archer_soldier.ExportJson");
+    anim_data.anim = asset_server.load("Resources/Animations/ArtillerySupport.ExportJson",);
 }
 
 fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
@@ -82,13 +89,14 @@ fn spawn_anim(
         Cocos2dAnimator {
             duration: None,
             anim_handle: anim_data.anim.clone(),
-            new_anim: Some("run".to_string()),
+            new_anim: Some("fly".to_string()),
             mode: AnimationMode::Loop,
             event_channel: Some(0),
+            face_dir: AnimationFaceDir::Right,
         },
         SpatialBundle {
             transform: Transform {
-                // scale: Vec3::splat(3.5),
+                scale: Vec3::splat(3.5),
                 ..default()
             },
             ..default()

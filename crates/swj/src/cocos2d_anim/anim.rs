@@ -127,9 +127,26 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
             for ta in anim_data["texture_data"].as_array().unwrap() {
                 let ta = ta.as_object().unwrap();
                 let name = ta["name"].as_str().unwrap().to_string();
-                let plist_file = ta["plistFile"].as_str().unwrap().to_string();
+                let mut plist_file = ta["plistFile"].as_str().unwrap().to_string();
                 let px = ta["pX"].as_f64().unwrap() as f32;
                 let py = ta["pY"].as_f64().unwrap() as f32;
+
+                if plist_file.is_empty() {
+                    for (plist_name, plist_frame) in plist_file_data.iter() {
+                        if plist_frame.frames.iter().any(|sf| sf.name == name) {
+                            plist_file = plist_name.clone();
+                            break;
+                        }
+                    }
+
+                    if plist_file.is_empty() {
+                        warn!("plist_file is empty and can't be found in all loaded plist files.\
+                        Animation file: {}, name: {}",
+                               load_context.path().to_str().unwrap(),
+                               name);
+                    }
+                }
+
                 let data = TextureData {
                     plist_file,
                     px,
@@ -198,6 +215,10 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                 let interval = 1.0 / interval * 2.0;
                 let frame_size = mbd["dr"].as_f64().unwrap() as usize + 1;
                 let mut layers = HashMap::new();
+
+                if mbd.get("mov_bone_data").is_none() {
+                    continue;
+                }
 
                 for layer in mbd["mov_bone_data"].as_array().unwrap() {
                     let layer = layer.as_object().unwrap();

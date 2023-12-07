@@ -46,8 +46,8 @@ fn parse_frame_from_plist(frame_attr: &Dictionary, frame_name: &str) -> SpriteFr
     if let Some(Value::String(s)) = frame_attr.get("offset") {
         let s = s.replace("{", "").replace("}", "");
         let mut offset = s.split(",");
-        sf.offset.0 = offset.next().unwrap().parse::<i32>().unwrap() as f32;
-        sf.offset.1 = offset.next().unwrap().parse::<i32>().unwrap() as f32;
+        sf.offset.0 = offset.next().unwrap().parse::<f32>().unwrap();
+        sf.offset.1 = offset.next().unwrap().parse::<f32>().unwrap();
     }
 
     if let Some(Value::Boolean(b)) = frame_attr.get("rotated") {
@@ -74,7 +74,7 @@ fn parse_frame_from_plist(frame_attr: &Dictionary, frame_name: &str) -> SpriteFr
 }
 
 
-fn load_plist(dict: Value) -> (Vec<SpriteFrame>, String, Vec2) {
+fn parse_plist(dict: Value) -> (Vec<SpriteFrame>, String, Vec2) {
     let mut sprite_frames = vec![];
 
     let mut tex_file_name: String = "".to_string();
@@ -136,7 +136,7 @@ impl AssetLoader for PlistSpriteAssetLoader {
             let mut bytes = Vec::new();
             reader.read_to_end(&mut bytes).await?;
             let dict = plist::from_bytes(&bytes).unwrap();
-            let (sprite_frames, tex_name, dims) = load_plist(dict);
+            let (sprite_frames, tex_name, dims) = parse_plist(dict);
             let tex_img = load_context.load(load_context.path().parent().unwrap().join(tex_name));
             let mut atlas = TextureAtlas::new_empty(tex_img.clone(), dims);
 
