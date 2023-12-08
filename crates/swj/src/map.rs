@@ -5,17 +5,15 @@ use bevy::{
     utils::BoxedFuture,
 };
 use bevy::asset::AsyncReadExt;
-use bevy::math::{vec2, vec3};
+use bevy::input::mouse::MouseWheel;
+use bevy::input::touchpad::TouchpadMagnify;
 use bevy::prelude::shape::Quad;
 use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::texture::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::sprite::Anchor;
 use bevy::utils::thiserror;
-use plist::Dictionary;
-use plist::Value;
 use serde_xml::value::{Content, Element};
 use thiserror::Error;
-
 
 pub struct MapPlugin;
 
@@ -24,7 +22,14 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset::<TmxMapAsset>()
             .init_asset_loader::<TmxMapAssetLoader>()
-            .add_systems(Update, map_system);
+            .init_resource::<CameraMoveLimit>()
+            .add_systems(Update,
+                         (
+                             map_system,
+                             mv_camera_to_map,
+                             mac_view_move,
+                         ),
+            );
     }
 }
 
@@ -36,13 +41,109 @@ pub struct TmxMap {
 #[derive(Component, Deref, DerefMut)]
 pub struct TmxMapBg(pub Vec2);
 
+
+#[derive(Resource, Default)]
+struct CameraMoveLimit {
+    scale_min: f32,
+    scale_max: f32,
+    rect: Rect,
+    win_size: Vec2,
+}
+
+fn mac_view_move(
+    mut query: Query<(&mut Transform, &mut OrthographicProjection)>,
+    mut touchpad_magnify_events: EventReader<TouchpadMagnify>,
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    camera_move_limit: Res<CameraMoveLimit>,
+) {
+    for tme in touchpad_magnify_events.read() {
+        for (mut transform, mut project) in query.iter_mut() {
+            project.scale -= tme.0 * 2.0;
+
+            if project.scale < camera_move_limit.scale_min {
+                project.scale = camera_move_limit.scale_min;
+            } else if project.scale > camera_move_limit.scale_max {
+                project.scale = camera_move_limit.scale_max;
+            }
+
+            adjust_camera(camera_move_limit.as_ref(), transform.as_mut(), project.as_ref());
+        }
+    }
+
+    for mwe in mouse_wheel_events.read() {
+        for (mut transform, mut project) in query.iter_mut() {
+            // info!("{:?}", mwe);
+            transform.translation.x -= mwe.x;
+            transform.translation.y += mwe.y;
+
+            adjust_camera(camera_move_limit.as_ref(), transform.as_mut(), project.as_ref());
+        }
+    }
+}
+
+fn adjust_camera(camera_move_limit: &CameraMoveLimit, transform: &mut Transform, project: &OrthographicProjection) {
+    let view_size = camera_move_limit.win_size * project.scale;
+    let view_rect = Rect::new(
+        transform.translation.x - view_size.x / 2.0,
+        transform.translation.y - view_size.y / 2.0,
+        transform.translation.x + view_size.x / 2.0,
+        transform.translation.y + view_size.y / 2.0,
+    );
+
+    let map_rect = camera_move_limit.rect;
+
+    if view_rect.min.x < map_rect.min.x {
+        transform.translation.x = map_rect.min.x + view_size.x / 2.0;
+    } else if view_rect.max.x > map_rect.max.x {
+        transform.translation.x = map_rect.max.x - view_size.x / 2.0;
+    }
+
+    if view_rect.min.y < map_rect.min.y {
+        transform.translation.y = map_rect.min.y + view_size.y / 2.0;
+    } else if view_rect.max.y > map_rect.max.y {
+        transform.translation.y = map_rect.max.y - view_size.y / 2.0;
+    }
+}
+
+
+fn mv_camera_to_map(
+    mut camera_move_limit: ResMut<CameraMoveLimit>,
+    mut camera_query: Query<(&mut Transform, &mut OrthographicProjection)>,
+    win_query: Query<&Window>,
+    tmx_map_asset: Res<Assets<TmxMapAsset>>,
+    query: Query<&TmxMap, Added<TmxMap>>,
+) {
+    for tmx_map in query.iter() {
+        let map = tmx_map_asset.get(&tmx_map.handle).unwrap();
+        let w = map.width;
+        let h = map.height;
+
+        let win = win_query.single();
+        let win_w = win.width();
+        let win_h = win.height();
+
+        camera_move_limit.rect = Rect::new(0.0, 0.0, w, h);
+        camera_move_limit.win_size = Vec2::new(win_w, win_h);
+        camera_move_limit.scale_max = h / win_h;
+        camera_move_limit.scale_min = camera_move_limit.scale_max / 4.0;
+
+        for (mut transform, mut project) in camera_query.iter_mut() {
+            project.scale = h / win_h;
+
+            let t_w = win_w * project.scale;
+            transform.translation.y = h / 2.0;
+            transform.translation.x = t_w / 2.0;
+        }
+    }
+}
+
 fn map_system(
     mut commands: Commands,
     tmx_map_asset: Res<Assets<TmxMapAsset>>,
     query: Query<&TmxMap, Added<TmxMap>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut textures: ResMut<Assets<Image>>,
+    textures: ResMut<Assets<Image>>,
 ) {
     for tmx_map in query.iter() {
         let tmx_map = tmx_map_asset.get(&tmx_map.handle).unwrap();
