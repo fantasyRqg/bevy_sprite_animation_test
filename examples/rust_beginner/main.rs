@@ -1,69 +1,52 @@
-use std::f32::consts::{FRAC_PI_2, PI};
-use bevy::prelude::*;
-use bevy::sprite::Anchor;
-use bevy::ui::PrepareNextFrameMaterials;
-use bevy::utils::HashMap;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+//! Prints all mouse events to the console.
 
+use bevy::{
+    input::{
+        mouse::{MouseButtonInput, MouseMotion, MouseWheel},
+        touchpad::{TouchpadMagnify, TouchpadRotate},
+    },
+    prelude::*,
+};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_systems(Startup, setup)
-        .add_systems(Update, hanle_key)
+        .add_systems(Update, print_mouse_events_system)
         .run();
 }
 
-
-#[derive(Component)]
-struct Elm;
-
-fn setup(
-    mut commands: Commands,
+/// This system prints out all mouse events as they come in
+fn print_mouse_events_system(
+    mut mouse_button_input_events: EventReader<MouseButtonInput>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    mut touchpad_magnify_events: EventReader<TouchpadMagnify>,
+    mut touchpad_rotate_events: EventReader<TouchpadRotate>,
 ) {
-    commands.spawn(Camera2dBundle::default());
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(100.0, 100.0)),
-                color: Color::RED,
-                ..default()
-            },
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..Default::default()
-        },
-        Elm
-    ))
-        .with_children(|parent| {
-            parent.spawn(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(20.0, 20.0)),
-                    color: Color::GREEN,
-                    ..default()
-                },
-                transform: Transform::from_xyz(-30.0, 30.0, 0.0),
-                ..default()
-            });
-        });
-}
+    for event in mouse_button_input_events.read() {
+        info!("{:?}", event);
+    }
 
-fn hanle_key(
-    mut query: Query<&mut Transform, With<Elm>>,
-    keyboard_input: Res<Input<KeyCode>>,
-) {
-    for mut transform in query.iter_mut() {
-        if keyboard_input.just_pressed(KeyCode::A) {
-            
-        }
-        // if keyboard_input.pressed(KeyCode::D) {
-        //     transform.translation.x += 1.0;
-        // }
-        // if keyboard_input.pressed(KeyCode::W) {
-        //     transform.translation.y += 1.0;
-        // }
-        // if keyboard_input.pressed(KeyCode::S) {
-        //     transform.translation.y -= 1.0;
-        // }
+    for event in mouse_motion_events.read() {
+        info!("{:?}", event);
+    }
+
+    for event in cursor_moved_events.read() {
+        info!("{:?}", event);
+    }
+
+    for event in mouse_wheel_events.read() {
+        info!("{:?}", event);
+    }
+
+    // This event will only fire on macOS
+    for event in touchpad_magnify_events.read() {
+        info!("{:?}", event);
+    }
+
+    // This event will only fire on macOS
+    for event in touchpad_rotate_events.read() {
+        info!("{:?}", event);
     }
 }

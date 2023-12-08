@@ -3,9 +3,9 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use rand::prelude::*;
-use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 
 use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, Cocos2dAnimator};
+use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::game::GameStates;
 
 pub(crate) struct PfControllerPlugin;
@@ -215,7 +215,7 @@ impl Default for ProjectileRes {
             "Resources/Animations/b_archer_arrow_01.ExportJson",
             "Resources/Animations/IceBall.ExportJson",
             "Resources/Animations/hailong_spear_thunder_blow.ExportJson",
-            "Resources/Animations/burning_rock.ExportJson",
+            // "Resources/Animations/burning_rock.ExportJson",
             "Resources/Animations/MageBall.ExportJson",
             // "Resources/Animations/MagicBallBlue.ExportJson",
             "Resources/Animations/MagicBallGreenNew.ExportJson",
@@ -226,7 +226,7 @@ impl Default for ProjectileRes {
             "Resources/Animations/ThunderHummerBullet.ExportJson",
             "Resources/Animations/MultiBlueArrowForWenling.ExportJson",
             "Resources/Animations/ammu_rock.ExportJson",
-            "Resources/Animations/HellfireRockfallGreen.ExportJson",
+            // "Resources/Animations/HellfireRockfallGreen.ExportJson",
             "Resources/Animations/arrow_red.ExportJson",
             "Resources/Animations/BlackArrow.ExportJson",
         ];
@@ -466,7 +466,7 @@ fn spawn_event(
 
 fn debug_projectile(
     mut commands: Commands,
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     projectile_info: Res<ProjectileRes>,
     mut projectile_query: Query<(Entity), With<Projectile>>,
     mut index: Local<usize>,
