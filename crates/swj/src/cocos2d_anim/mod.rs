@@ -48,6 +48,7 @@ impl Plugin for Cocos2dAnimPlugin {
 pub enum AnimationMode {
     Once,
     Loop,
+    Remove,
 }
 
 pub enum AnimationFaceDir {
@@ -61,8 +62,21 @@ pub struct Cocos2dAnimator {
     pub anim_handle: Handle<Cocos2dAnimAsset>,
     pub new_anim: Option<String>,
     pub mode: AnimationMode,
-    pub event_channel: Option<usize>,
+    pub event_channel: Option<i32>,
     pub face_dir: AnimationFaceDir,
+}
+
+impl Default for Cocos2dAnimator {
+    fn default() -> Self {
+        Cocos2dAnimator {
+            duration: None,
+            anim_handle: Handle::default(),
+            new_anim: None,
+            mode: AnimationMode::Once,
+            event_channel: None,
+            face_dir: AnimationFaceDir::Right,
+        }
+    }
 }
 
 impl Cocos2dAnimator {
@@ -101,7 +115,7 @@ pub enum EventType {
 #[derive(Event, Debug)]
 pub struct AnimEvent {
     pub entity: Entity,
-    pub channel: usize,
+    pub channel: i32,
     pub evt_type: EventType,
 }
 
@@ -155,6 +169,7 @@ fn spawn_anim(
 }
 
 fn animate_sprite(
+    mut commands: Commands,
     time: Res<Time>,
     animations: Res<Assets<Cocos2dAnimAsset>>,
     mut query: Query<(&mut Cocos2dAnimator, &mut Cocos2dAnimatorInner, &Children, Entity)>,
@@ -194,6 +209,17 @@ fn animate_sprite(
                 }
                 AnimationMode::Loop => {
                     animator.frame_idx = 0;
+                }
+                AnimationMode::Remove => {
+                    commands.entity(entity)
+                        .remove::<Cocos2dAnimator>()
+                        .remove::<Cocos2dAnimatorInner>();
+
+                    for child in children.iter() {
+                        if child_query.get_mut(*child).is_ok() {
+                            commands.entity(*child).despawn_recursive();
+                        }
+                    }
                 }
             }
         } else {

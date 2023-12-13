@@ -41,7 +41,7 @@ fn setup_unit_projectile(
     mut window_size: ResMut<WindowSize>,
 ) {
     let mut units = Vec::with_capacity(100);
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     let (window_width, window_height) = {
         let window = windows.single();
         (window.width(), window.height())

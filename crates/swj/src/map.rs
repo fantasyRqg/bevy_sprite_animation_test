@@ -15,6 +15,8 @@ use bevy::utils::thiserror;
 use serde_xml::value::{Content, Element};
 use thiserror::Error;
 
+use crate::game::GameStates::PrepareScene;
+
 pub struct MapPlugin;
 
 
@@ -25,11 +27,14 @@ impl Plugin for MapPlugin {
             .init_resource::<CameraMoveLimit>()
             .add_systems(Update,
                          (
-                             map_system,
-                             mv_camera_to_map,
                              mac_view_move,
+                             (
+                                 map_system,
+                                 mv_camera_to_map,
+                             ).run_if(in_state(PrepareScene)),
                          ),
-            );
+            )
+        ;
     }
 }
 
@@ -42,7 +47,7 @@ pub struct TmxMap {
 pub struct TmxMapBg(pub Vec2);
 
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 struct CameraMoveLimit {
     scale_min: f32,
     scale_max: f32,
@@ -66,7 +71,7 @@ fn mac_view_move(
                 project.scale = camera_move_limit.scale_max;
             }
 
-            adjust_camera(camera_move_limit.as_ref(), transform.as_mut(), project.as_ref());
+            adjust_camera(&camera_move_limit, &mut transform, &project);
         }
     }
 

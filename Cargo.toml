@@ -74,3 +74,7 @@ path = "examples/rust_beginner/main.rs"
 name = "my_winit"
 path = "examples/my_winit/main.rs"
 
+[[example]]
+name = "tmx_map"
+path = "examples/tmx_map/main.rs"
+
