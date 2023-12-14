@@ -1,18 +1,18 @@
 use std::collections::HashMap;
+
 use bevy::math::vec2;
 use bevy::prelude::*;
 use bevy::prelude::TimerMode::Repeating;
-use bevy::utils::Instant;
 use rand::prelude::*;
+
 use crate::AnimChannel;
-use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, Cocos2dAnimator};
+use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::game::GameStates;
 use crate::game::GameStates::{Loading, Playing, PrepareLoad, PrepareScene};
 use crate::map::{TmxMap, TmxMapAsset};
-use crate::resource::{ConfigLoaded, ConfigResource, ConfigResourceParse, ResourcePath};
-use crate::unit::{get_unit_resources, Unit, UnitAnimName, UnitIntention, UnitTeamLeft};
-
+use crate::resource::{ConfigLoaded, ConfigResource, ResourcePath};
+use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitIntention, UnitTeamLeft, UnitTeamRight};
 
 pub struct ClashPlugin;
 
@@ -214,16 +214,16 @@ fn generate_unit(
 
     for _ in 0..left_gen_count {
         let pos = random_pos_in_rect(&left_gen_rect, &mut rng);
-        let name = loaded_units.right_units.choose(&mut rng).unwrap();
-        let mut unit = Unit::new(name, 1, &config_res, &asset_server);
-        unit.intention = UnitIntention::AttackTo(vec2(MAP_SIZE.x, pos.y));
+        let name = loaded_units.left_units.choose(&mut rng).unwrap();
+        let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
+        unit_bundle.state.attack_to(vec2(MAP_SIZE.x, pos.y));
         let unit_info = config_res.units.get(name).unwrap();
         commands.spawn((
             SpatialBundle {
                 transform: Transform::from_translation(pos.extend(0.)),
                 ..default()
             },
-            unit,
+            unit_bundle,
             UnitTeamLeft,
             Cocos2dAnimator {
                 anim_handle: asset_server.load(unit_info.animation_name.anim_path()),
@@ -239,15 +239,16 @@ fn generate_unit(
     for _ in 0..right_gen_count {
         let pos = random_pos_in_rect(&right_gen_rect, &mut rng);
         let name = loaded_units.right_units.choose(&mut rng).unwrap();
-        let mut unit = Unit::new(name, 1, &config_res, &asset_server);
-        unit.intention = UnitIntention::AttackTo(vec2(0., pos.y));
+        let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
+        unit_bundle.state.attack_to(vec2(0., pos.y));
         let unit_info = config_res.units.get(name).unwrap();
         commands.spawn((
             SpatialBundle {
                 transform: Transform::from_translation(pos.extend(0.)),
                 ..default()
             },
-            unit,
+            unit_bundle,
+            UnitTeamRight,
             Cocos2dAnimator {
                 anim_handle: asset_server.load(unit_info.animation_name.anim_path()),
                 face_dir: AnimationFaceDir::Left,

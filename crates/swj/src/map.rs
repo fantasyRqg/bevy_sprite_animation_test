@@ -25,6 +25,7 @@ impl Plugin for MapPlugin {
         app.init_asset::<TmxMapAsset>()
             .init_asset_loader::<TmxMapAssetLoader>()
             .init_resource::<CameraMoveLimit>()
+            .init_resource::<CurrentMapInfo>()
             .add_systems(Update,
                          (
                              mac_view_move,
@@ -142,12 +143,18 @@ fn mv_camera_to_map(
     }
 }
 
+#[derive(Resource, Default)]
+pub struct CurrentMapInfo {
+    pub size: Vec2,
+}
+
 fn map_system(
     mut commands: Commands,
     tmx_map_asset: Res<Assets<TmxMapAsset>>,
     query: Query<&TmxMap, Added<TmxMap>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut current_map_info: ResMut<CurrentMapInfo>,
     textures: ResMut<Assets<Image>>,
 ) {
     for tmx_map in query.iter() {
@@ -166,6 +173,7 @@ fn map_system(
         }
 
         let mut mesh: Mesh = Quad::new(Vec2::new(tmx_map.width, tmx_map.height)).into();
+        current_map_info.size = Vec2::new(tmx_map.width, tmx_map.height);
 
         let bg_image = textures.get(&tmx_map.background).unwrap();
 
@@ -294,6 +302,7 @@ impl AssetLoader for TmxMapAssetLoader {
                                         let y = deco.attributes["y"].first().unwrap().parse::<f32>().unwrap();
                                         let width = deco.attributes["width"].first().unwrap().parse::<i32>().unwrap();
                                         let height = deco.attributes["height"].first().unwrap().parse::<i32>().unwrap();
+
 
                                         let z = if matches!(name.as_str(),"tudui_1.png"|"tudui_2.png"|"liefeng.png") {
                                             2.0

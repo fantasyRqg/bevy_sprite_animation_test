@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 use serde_json::Value;
+use crate::cocos2d_anim::{AnimationMode, Cocos2dAnimator, Cocos2dAnimatorPlayer};
 
-use crate::game::GameStates::PrepareLoad;
-use crate::resource::{action, ConfigResource, ConfigResourceParse};
+use crate::game::GameStates::{Playing, PrepareLoad};
+use crate::map::{CurrentMapInfo, TmxMapBg};
+use crate::resource::{ConfigResource, ConfigResourceParse};
 use crate::resource::action::Action;
 use crate::resource::ResourcePath;
-use crate::unit::UnitAnimName::Stand;
 
 pub struct UnitPlugin;
 
@@ -13,7 +14,24 @@ impl Plugin for UnitPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(OnEnter(PrepareLoad), load_unit_config)
+            .add_systems(Update,
+                         (
+                             unit_z_order,
+                             unit_state::<UnitTeamLeft>,
+                             unit_state::<UnitTeamRight>,
+                         ).run_if(in_state(Playing)),
+            )
         ;
+    }
+}
+
+fn unit_z_order(
+    mut query: Query<&mut Transform, With<Unit>>,
+    map_info: Res<CurrentMapInfo>,
+) {
+    let map_height = map_info.size.y;
+    for mut transform in query.iter_mut() {
+        transform.translation.z = map_height - transform.translation.y;
     }
 }
 
@@ -27,6 +45,76 @@ fn load_unit_config(
         parse_fun: parse_unit_cfg,
         ..default()
     });
+}
+
+fn move_transform_to(transform: &mut Transform, dest_transform: &Transform, speed: f32) {
+    let dir = dest_transform.translation.truncate() - transform.translation.truncate();
+    let dir = if dir.length() < speed {
+        dir
+    } else {
+        dir.normalize() * speed
+    };
+
+    transform.translation += dir.extend(0.);
+}
+
+const MIN_DISTANCE_DIFF: f32 = 0.1;
+
+fn unit_state<T: Component>(
+    mut query: Query<(&Unit, &mut UnitStateComponent, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), With<T>>,
+    target_query: Query<&Transform, (With<Unit>, Without<T>)>,
+) {
+    for (unit, mut state, mut transform, mut animator, anim_player) in query.iter_mut() {
+        match state.state {
+            UnitState::Idle => {
+                if anim_player.anim_name != UnitAnimName::Stand.as_str() {
+                    animator.new_anim = Some(UnitAnimName::Stand.into());
+                    animator.mode = AnimationMode::Loop;
+                }
+            }
+            UnitState::Moving => {
+                if anim_player.anim_name != UnitAnimName::Run.as_str() {
+                    animator.new_anim = Some(UnitAnimName::Run.into());
+                    animator.mode = AnimationMode::Loop;
+                }
+
+                match state.intention {
+                    UnitIntention::MoveTo(pos) => {
+                        move_transform_to(&mut transform, &Transform::from_translation(pos.extend(0.)), unit.move_speed);
+
+                        if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
+                            state.state = UnitState::Idle;
+                        }
+                    }
+                    UnitIntention::AttackTo(pos) => {
+                        if let Some(target) = state.attack_target {
+                            if let Ok(target_transform) = target_query.get(target) {
+                                move_transform_to(&mut transform, target_transform, unit.move_speed);
+                            }
+
+                            if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
+                                state.state = UnitState::Attacking;
+                            }
+                        } else {
+                            move_transform_to(&mut transform, &Transform::from_translation(pos.extend(0.)), unit.move_speed);
+
+                            if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
+                                state.state = UnitState::Idle;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            UnitState::Attacking => {}
+            UnitState::Dead => {
+                if anim_player.anim_name != UnitAnimName::Die.as_str() {
+                    animator.new_anim = Some(UnitAnimName::Die.into());
+                    animator.mode = AnimationMode::Once;
+                }
+            }
+        }
+    }
 }
 
 
@@ -200,17 +288,7 @@ pub enum UnitIntention {
 #[derive(Component)]
 pub struct Unit {
     pub actions: Vec<(String, Action)>,
-    pub state: UnitState,
-    pub search_enemy: bool,
-    pub attack_target: Option<Entity>,
-    pub intention: UnitIntention,
     pub view_range: f32,
-
-    pub health: f32,
-    pub health_recovery_speed: f32,
-
-    pub damage: f32,
-    pub damage_fluctuation_range: Vec2,
 
     pub move_speed: f32,
 
@@ -219,8 +297,50 @@ pub struct Unit {
     pub body_height: f32,
 }
 
-impl Unit {
-    pub fn new(name: &str, level: u32, config_res: &ConfigResource, asset_server: &AssetServer) -> Unit {
+#[derive(Component)]
+pub struct UnitStateComponent {
+    pub state: UnitState,
+    pub search_enemy: bool,
+    pub attack_target: Option<Entity>,
+    pub intention: UnitIntention,
+}
+
+impl UnitStateComponent {
+    pub fn move_to(&mut self, pos: Vec2) {
+        self.state = UnitState::Moving;
+        self.intention = UnitIntention::MoveTo(pos);
+    }
+
+    pub fn attack_to(&mut self, pos: Vec2) {
+        self.state = UnitState::Moving;
+        self.intention = UnitIntention::AttackTo(pos);
+    }
+}
+
+#[derive(Component)]
+pub struct UnitDamage {
+    pub damage: f32,
+    pub damage_fluctuation_range: Vec2,
+}
+
+#[derive(Component)]
+pub struct UnitHealth {
+    pub health: f32,
+    pub health_recovery_speed: f32,
+}
+
+
+#[derive(Bundle)]
+pub struct UnitBundle {
+    pub unit: Unit,
+    pub state: UnitStateComponent,
+    pub health: UnitHealth,
+    pub damage: UnitDamage,
+}
+
+
+impl UnitBundle {
+    pub fn new(name: &str, level: u32, config_res: &ConfigResource, asset_server: &AssetServer) -> UnitBundle {
         let unit_info = config_res.units.get(name).expect(format!("unit {} not found", name).as_str());
         let mut actions = vec![];
         for action in &unit_info.actions {
@@ -236,21 +356,29 @@ impl Unit {
         // sort by cd time, so longer cd time action will be used first
         actions.sort_by(|a, b| a.1.cd_time.cmp(&b.1.cd_time).reverse());
 
-        Unit {
-            actions,
-            state: UnitState::Idle,
-            search_enemy: false,
-            attack_target: None,
-            intention: UnitIntention::StandAt(Vec2::ZERO),
-            view_range: unit_info.view,
-            health: unit_info.health_base + unit_info.health_factor * level as f32,
-            health_recovery_speed: unit_info.health_recovery_speed,
-            damage: unit_info.damage_base + unit_info.damage_factor * level as f32,
-            damage_fluctuation_range: Vec2::new(unit_info.damage_min_bias, unit_info.damage_max_bias),
-            move_speed: unit_info.move_speed,
-            body_radius: unit_info.body_radius,
-            body_width: unit_info.body_width,
-            body_height: unit_info.body_height,
+        UnitBundle {
+            unit: Unit {
+                actions,
+                view_range: unit_info.view,
+                move_speed: unit_info.move_speed * 0.03,
+                body_radius: unit_info.body_radius,
+                body_width: unit_info.body_width,
+                body_height: unit_info.body_height,
+            },
+            state: UnitStateComponent {
+                state: UnitState::Idle,
+                search_enemy: false,
+                attack_target: None,
+                intention: UnitIntention::StandAt(Vec2::ZERO),
+            },
+            health: UnitHealth {
+                health: unit_info.health_base + unit_info.health_factor * level as f32,
+                health_recovery_speed: unit_info.health_recovery_speed,
+            },
+            damage: UnitDamage {
+                damage: unit_info.damage_base + unit_info.damage_factor * level as f32,
+                damage_fluctuation_range: Vec2::new(unit_info.damage_min_bias, unit_info.damage_max_bias),
+            },
         }
     }
 }
@@ -275,26 +403,20 @@ impl From<String> for UnitAnimName {
     }
 }
 
-impl From<&str> for UnitAnimName {
-    fn from(value: &str) -> Self {
-        match value {
-            "born" => UnitAnimName::Born,
-            "stand" => UnitAnimName::Stand,
-            "run" => UnitAnimName::Run,
-            "die" => UnitAnimName::Die,
-            _ => UnitAnimName::Action(value.to_string()),
-        }
+impl From<UnitAnimName> for String {
+    fn from(value: UnitAnimName) -> Self {
+        value.as_str().to_string()
     }
 }
 
-impl Into<String> for UnitAnimName {
-    fn into(self) -> String {
+impl UnitAnimName {
+    pub fn as_str(&self) -> &str {
         match self {
-            UnitAnimName::Born => "born".to_string(),
-            UnitAnimName::Stand => "stand".to_string(),
-            UnitAnimName::Run => "run".to_string(),
-            UnitAnimName::Die => "die".to_string(),
-            UnitAnimName::Action(s) => s,
+            UnitAnimName::Born => "born",
+            UnitAnimName::Stand => "stand",
+            UnitAnimName::Run => "run",
+            UnitAnimName::Die => "die",
+            UnitAnimName::Action(s) => s.as_str(),
         }
     }
 }

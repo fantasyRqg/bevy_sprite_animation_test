@@ -1,41 +1,62 @@
-use bevy::prelude::*;
-use bevy::prelude::shape::Quad;
-use bevy::sprite::MaterialMesh2dBundle;
+//! This example illustrates how to react to component change.
+
+use bevy::{ecs::world::Ref, prelude::*};
+use rand::Rng;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (change_component, change_detection, tracker_monitoring),
+        )
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    asset_server: Res<AssetServer>,
-) {
-    commands.spawn(Camera2dBundle::default());
+#[derive(Component, PartialEq, Debug)]
+struct MyComponent(f32);
 
-    let mut mesh: Mesh = Quad::new(Vec2::new(300., 5.)).into();
+fn setup(mut commands: Commands) {
+    commands.spawn(MyComponent(0.));
+    commands.spawn(Transform::IDENTITY);
+}
 
-    let img: Handle<Image> = asset_server.load("Resources/Animations/shot_tail_oragne.png");
+fn change_component(time: Res<Time>, mut query: Query<(Entity, &mut MyComponent)>) {
+    for (entity, mut component) in &mut query {
+        if rand::thread_rng().gen_bool(0.1) {
+            info!("changing component {:?}", entity);
+            let new_component = MyComponent(time.elapsed_seconds().round());
+            // Change detection occurs on mutable dereference,
+            // and does not consider whether or not a value is actually equal.
+            // To avoid triggering change detection when nothing has actually changed,
+            // you can use the `set_if_neq` method on any component or resource that implements PartialEq
+            // component.set_if_neq(new_component);
+            // let c = component.bypass_change_detection();
+            // let c = component.bypass_change_detection();
+            info!("new_component: {}", component.0);
+            // component.0 = 0.1;
+        }
+    }
+}
 
-    let vertex_colors: Vec<[f32; 4]> = vec![
-        [1., 1., 1., 0.],
-        [1., 1., 1., 0.],
-        [1., 1., 1., 1.],
-        [1., 1., 1., 1.],
-    ];
+// There are query filters for `Changed<T>` and `Added<T>`
+// Only entities matching the filters will be in the query
+fn change_detection(query: Query<(Entity, &MyComponent), Changed<MyComponent>>) {
+    for (entity, component) in &query {
+        info!("{:?} changed: {:?}", entity, component);
+    }
+}
 
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
-
-    commands.spawn(MaterialMesh2dBundle {
-        mesh: meshes
-            .add(mesh)
-            .into(),
-        material: materials.add(ColorMaterial::from(img)),
-        transform: Transform::from_translation(Vec3::new(50., 0., 0.)),
-        ..default()
-    });
+// By using `Ref`, the query is not filtered but the information is available
+fn tracker_monitoring(query: Query<(Entity, Ref<MyComponent>)>) {
+    for (entity, component) in &query {
+        info!(
+            "{:?}: {:?} -> {{is_added: {}, is_changed: {}}}",
+            entity,
+            component,
+            component.is_added(),
+            component.is_changed()
+        );
+    }
 }

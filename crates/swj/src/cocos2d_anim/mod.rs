@@ -92,10 +92,10 @@ enum AnimationState {
 }
 
 #[derive(Component)]
-struct Cocos2dAnimatorInner {
+pub struct Cocos2dAnimatorPlayer {
     frame_idx: usize,
     timer: Timer,
-    anim_name: String,
+    pub anim_name: String,
     state: AnimationState,
 }
 
@@ -146,7 +146,7 @@ fn spawn_anim(
             animation.interval
         };
 
-        commands.entity(entity).insert(Cocos2dAnimatorInner {
+        commands.entity(entity).insert(Cocos2dAnimatorPlayer {
             frame_idx: usize::MAX,
             timer: Timer::from_seconds(interval, Repeating),
             state: AnimationState::Playing,
@@ -172,7 +172,7 @@ fn animate_sprite(
     mut commands: Commands,
     time: Res<Time>,
     animations: Res<Assets<Cocos2dAnimAsset>>,
-    mut query: Query<(&mut Cocos2dAnimator, &mut Cocos2dAnimatorInner, &Children, Entity)>,
+    mut query: Query<(&mut Cocos2dAnimator, &mut Cocos2dAnimatorPlayer, &Children, Entity)>,
     mut child_query: Query<(&mut TextureAtlasSprite, &mut CocoAnim2dAnimatorLayer, &mut Handle<TextureAtlas>, &mut Transform)>,
     mut events: EventWriter<AnimEvent>,
 ) {
@@ -213,7 +213,7 @@ fn animate_sprite(
                 AnimationMode::Remove => {
                     commands.entity(entity)
                         .remove::<Cocos2dAnimator>()
-                        .remove::<Cocos2dAnimatorInner>();
+                        .remove::<Cocos2dAnimatorPlayer>();
 
                     for child in children.iter() {
                         if child_query.get_mut(*child).is_ok() {
