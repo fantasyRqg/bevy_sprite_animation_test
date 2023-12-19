@@ -6,6 +6,7 @@ fn main() {
     }
 }
 
+#[allow(dead_code)]
 fn android() {
     println!("cargo:rustc-link-lib=c++_shared");
 

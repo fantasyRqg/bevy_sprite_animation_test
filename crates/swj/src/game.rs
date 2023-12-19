@@ -1,12 +1,11 @@
 use bevy::app::App;
 use bevy::math::vec2;
 use bevy::prelude::*;
+
 use crate::clash::ClashPlugin;
 use crate::cocos2d_anim::Cocos2dAnimPlugin;
 use crate::map::MapPlugin;
-use crate::pf_controller::PfControllerPlugin;
 use crate::resource::ResourcePlugin;
-use crate::sprite_debug::SpriteDebugPlugin;
 use crate::unit::UnitPlugin;
 
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]

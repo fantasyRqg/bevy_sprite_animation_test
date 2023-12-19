@@ -77,7 +77,7 @@ fn mac_view_move(
     }
 
     for mwe in mouse_wheel_events.read() {
-        for (mut transform, mut project) in query.iter_mut() {
+        for (mut transform, project) in query.iter_mut() {
             // info!("{:?}", mwe);
             transform.translation.x -= mwe.x;
             transform.translation.y += mwe.y;
@@ -227,7 +227,7 @@ impl AssetLoader for TmxMapAssetLoader {
     type Settings = ();
     type Error = TmxMapAssetLoaderError;
 
-    fn load<'a>(&'a self, reader: &'a mut Reader, settings: &'a Self::Settings,
+    fn load<'a>(&'a self, reader: &'a mut Reader, _settings: &'a Self::Settings,
                 load_context: &'a mut LoadContext)
                 -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
@@ -255,8 +255,8 @@ impl AssetLoader for TmxMapAssetLoader {
                             if let Content::Members(tileset) = &tileset.members {
                                 if let Some(image) = tileset.get("image") {
                                     let bg_img = image[0].attributes["source"].first().unwrap();
-                                    let bg_w = image[0].attributes["width"].first().unwrap().parse::<f32>().unwrap();
-                                    let bg_h = image[0].attributes["height"].first().unwrap().parse::<f32>().unwrap();
+                                    // let bg_w = image[0].attributes["width"].first().unwrap().parse::<f32>().unwrap();
+                                    // let bg_h = image[0].attributes["height"].first().unwrap().parse::<f32>().unwrap();
 
                                     let sampler_desc = ImageSamplerDescriptor {
                                         address_mode_u: ImageAddressMode::Repeat,

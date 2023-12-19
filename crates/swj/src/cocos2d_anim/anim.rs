@@ -4,7 +4,7 @@ use bevy::{
     reflect::TypePath,
     utils::BoxedFuture,
 };
-use bevy::asset::{AssetContainer, AsyncReadExt};
+use bevy::asset::AsyncReadExt;
 use bevy::math::vec2;
 use bevy::utils::{HashMap, thiserror};
 use serde_json::Value;

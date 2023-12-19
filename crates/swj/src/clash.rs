@@ -12,7 +12,7 @@ use crate::game::GameStates;
 use crate::game::GameStates::{Loading, Playing, PrepareLoad, PrepareScene};
 use crate::map::{TmxMap, TmxMapAsset};
 use crate::resource::{ConfigLoaded, ConfigResource, ResourcePath};
-use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitIntention, UnitTeamLeft, UnitTeamRight};
+use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitTeamLeft, UnitTeamRight};
 
 pub struct ClashPlugin;
 
@@ -216,7 +216,7 @@ fn generate_unit(
         let pos = random_pos_in_rect(&left_gen_rect, &mut rng);
         let name = loaded_units.left_units.choose(&mut rng).unwrap();
         let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
-        unit_bundle.state.attack_to(vec2(MAP_SIZE.x, pos.y));
+        unit_bundle.intent.attack_to(vec2(MAP_SIZE.x, pos.y));
         let unit_info = config_res.units.get(name).unwrap();
         commands.spawn((
             SpatialBundle {
@@ -240,7 +240,7 @@ fn generate_unit(
         let pos = random_pos_in_rect(&right_gen_rect, &mut rng);
         let name = loaded_units.right_units.choose(&mut rng).unwrap();
         let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
-        unit_bundle.state.attack_to(vec2(0., pos.y));
+        unit_bundle.intent.attack_to(vec2(0., pos.y));
         let unit_info = config_res.units.get(name).unwrap();
         commands.spawn((
             SpatialBundle {

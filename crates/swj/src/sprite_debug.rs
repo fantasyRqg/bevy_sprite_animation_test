@@ -1,8 +1,7 @@
-use bevy::app::AppExit;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
-use crate::pf_controller::{Projectile, SpawnEvent, Unit};
 
+use crate::pf_controller::{Projectile, SpawnEvent, Unit};
 
 pub struct SpriteDebugPlugin;
 
@@ -238,7 +237,7 @@ fn btn_reset_game(
     mut commands: Commands,
     query_unit: Query<Entity, Or<(With<Unit>, With<Projectile>)>>,
     btn_query: Query<&Interaction, (Changed<Interaction>, With<TextResetGame>)>,
-    mut app_exit_events: EventWriter<AppExit>,
+    // mut app_exit_events: EventWriter<AppExit>,
 ) {
     let interaction = btn_query.get_single();
     if let Ok(Interaction::Pressed) = interaction {

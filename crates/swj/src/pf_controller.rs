@@ -468,7 +468,7 @@ fn debug_projectile(
     mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     projectile_info: Res<ProjectileRes>,
-    mut projectile_query: Query<(Entity), With<Projectile>>,
+    mut projectile_query: Query<Entity, With<Projectile>>,
     mut index: Local<usize>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Space) {
