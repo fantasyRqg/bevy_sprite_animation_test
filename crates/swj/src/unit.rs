@@ -1,5 +1,7 @@
 use std::ops::Range;
 use std::time::Duration;
+use bevy::input::ButtonState;
+use bevy::input::mouse::MouseButtonInput;
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -33,6 +35,7 @@ impl Plugin for UnitPlugin {
                              health_system,
                              unit_anim_event,
                              unit_die,
+                             debug_system,
                          ).run_if(in_state(Playing)),
             )
             .add_systems(Update, unit_team_system!(
@@ -53,6 +56,79 @@ impl Plugin for UnitPlugin {
     }
 }
 
+fn debug_system(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Transform), With<Unit>>,
+    info_query: Query<(&Cocos2dAnimator, &Cocos2dAnimatorPlayer), With<Unit>>,
+    mut mouse_btn: EventReader<MouseButtonInput>,
+    mut cursor_move: EventReader<CursorMoved>,
+    mut cur_pos: Local<Vec2>,
+    mut drag: Local<Option<Entity>>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
+    map_info: Res<CurrentMapInfo>,
+) {
+    let (camera, camera_trans) = camera_query.single();
+
+    for event in cursor_move.read() {
+        if let Some(pos) = camera.viewport_to_world_2d(camera_trans, event.position) {
+            *cur_pos = pos;
+        }
+
+        if let Some(entity) = *drag {
+            if let Ok((_, mut transform)) = query.get_mut(entity) {
+                transform.translation.x = cur_pos.x;
+                transform.translation.y = cur_pos.y;
+            }
+        }
+    }
+
+
+    let mut most_close_entity = None;
+    let mut min_distance = 1000000.0;
+
+    for event in mouse_btn.read() {
+        if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
+            for (entity, transform) in query.iter() {
+                let pos = transform.translation.truncate();
+                let distance = pos.distance(*cur_pos);
+                if distance < min_distance {
+                    min_distance = distance;
+                    most_close_entity = Some(entity);
+                }
+            }
+
+            *drag = most_close_entity;
+        }
+
+        if event.button == MouseButton::Left && event.state == ButtonState::Released {
+            *drag = None;
+        }
+    }
+
+    if let Some(entity) = most_close_entity {
+        commands.entity(entity).log_components();
+        if let Ok((animator, anim_player)) = info_query.get(entity) {
+            info!("anim: {:?}, {:?}", animator, anim_player);
+        }
+    }
+
+    // let mut entities = vec![];
+    //
+    // for (entity, player) in query.iter() {
+    //     if player.anim_name != "die" {
+    //         entities.push(entity);
+    //     }
+    // }
+    //
+    // for entity in last_entities.iter() {
+    //     if !entities.contains(entity) {
+    //         commands.entity(*entity).log_components();
+    //     }
+    // }
+    //
+    // *last_entities = entities;
+}
+
 
 #[derive(Component, Default, Deref, DerefMut)]
 struct WhoAttackMe(u32);
@@ -69,7 +145,7 @@ fn unit_search_prepare_sys(
     right_query: Query<(Entity, &Transform, &WhoAttackMe), (With<UnitTeamRight>, With<Unit>)>,
 ) {
     fn get_sort_key(pos: &Vec2, atk_me: u32, left: bool) -> f32 {
-        let offset_factor = 455.5;
+        let offset_factor = 105.5;
         let x_offset = if left {
             -(atk_me as f32 * offset_factor)
         } else {
@@ -137,7 +213,7 @@ fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) -> 
     transform.translation += dir.extend(0.);
 
 
-    if dir.x > 1e-5 {
+    if dir.x.abs() > 1e-5 {
         if dir.x > 0.0 {
             Some(AnimationFaceDir::Right)
         } else {
@@ -312,7 +388,7 @@ struct PerformingAction {
 
 fn performing_action(
     time: Res<Time>,
-    mut query: Query<(&mut Unit, &PerformingAction, &mut Cocos2dAnimator), Added<PerformingAction>>,
+    mut query: Query<(&mut Unit, &PerformingAction, &mut Cocos2dAnimator), (Added<PerformingAction>, Without<UnitDead>)>,
 ) {
     for (mut unit, action, mut animator) in query.iter_mut() {
         let (name, ref mut action) = &mut unit.actions[action.idx];
@@ -967,6 +1043,7 @@ struct LivingUintBundle {
     state: UnitState,
     who_attack_me: WhoAttackMe,
     search_enemy: SearchEnemy,
+    perform_action: PerformingAction,
 }
 
 #[derive(Component)]
@@ -989,7 +1066,6 @@ fn unit_die(
     mut query: Query<&mut Cocos2dAnimator, (Added<UnitDead>, With<Unit>)>,
 ) {
     for mut animator in query.iter_mut() {
-        // info!("one unit die");
         animator.new_anim = Some(UnitAnimName::Die.into());
         animator.mode = AnimationMode::Once;
         animator.event_channel = Some(AnimChannel::Unit.into());

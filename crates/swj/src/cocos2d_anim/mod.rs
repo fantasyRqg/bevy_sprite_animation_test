@@ -44,20 +44,20 @@ impl Plugin for Cocos2dAnimPlugin {
     }
 }
 
-
+#[derive(Debug)]
 pub enum AnimationMode {
     Once,
     Loop,
     Remove,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum AnimationFaceDir {
     Left,
     Right,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Cocos2dAnimator {
     pub duration: Option<Duration>,
     pub anim_handle: Handle<Cocos2dAnimAsset>,
@@ -92,7 +92,7 @@ enum AnimationState {
     Ended,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Cocos2dAnimatorPlayer {
     frame_idx: usize,
     timer: Timer,

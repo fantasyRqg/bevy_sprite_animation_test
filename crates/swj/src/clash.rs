@@ -129,14 +129,14 @@ fn check_preload_finished(
     state.set(Loading);
 
     let left_units = vec![
-        // "archer_soldier",
+        "archer_soldier",
         "malitia_warrior",
     ]
         .iter()
         .map(|s| s.to_string()).collect();
 
     let right_units = vec![
-        // "barbarian_archer",
+        "barbarian_archer",
         "barbarian_infantry",
     ]
         .iter()
@@ -236,7 +236,7 @@ impl Default for UnitGenRes {
         let right_size = vec2(x_offset, 600.0);
 
         UnitGenRes {
-            timer: Timer::from_seconds(1., Repeating),
+            timer: Timer::from_seconds(0.4, Repeating),
             left_gen_speed: 5,
             right_gen_speed: 5,
             left_gen_rect: Rect::new(left_centre.x - left_size.x / 2.0, left_centre.y - left_size.y / 2.0, left_centre.x + left_size.x / 2.0, left_centre.y + left_size.y / 2.0),
