@@ -10,6 +10,7 @@ mod clash;
 
 pub(crate) enum AnimChannel {
     Unit = 0,
+    UnitAction,
     Shot,
 }
 
@@ -23,7 +24,8 @@ impl From<i32> for AnimChannel {
     fn from(value: i32) -> Self {
         match value {
             0 => AnimChannel::Unit,
-            1 => AnimChannel::Shot,
+            1 => AnimChannel::UnitAction,
+            2 => AnimChannel::Shot,
             _ => panic!("unknown anim channel {}", value),
         }
     }

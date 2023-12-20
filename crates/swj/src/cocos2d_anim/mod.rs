@@ -51,6 +51,7 @@ pub enum AnimationMode {
     Remove,
 }
 
+#[derive(PartialEq)]
 pub enum AnimationFaceDir {
     Left,
     Right,
@@ -147,7 +148,7 @@ fn spawn_anim(
         };
 
         commands.entity(entity).insert(Cocos2dAnimatorPlayer {
-            frame_idx: usize::MAX,
+            frame_idx: 0,
             timer: Timer::from_seconds(interval, Repeating),
             state: AnimationState::Playing,
             anim_name,
@@ -211,6 +212,7 @@ fn animate_sprite(
                     animator.frame_idx = 0;
                 }
                 AnimationMode::Remove => {
+                    animator.state = Ended;
                     commands.entity(entity)
                         .remove::<Cocos2dAnimator>()
                         .remove::<Cocos2dAnimatorPlayer>();

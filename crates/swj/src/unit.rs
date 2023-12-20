@@ -1,24 +1,21 @@
+use std::ops::Range;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::utils::HashMap;
+use rand::Rng;
 use serde_json::Value;
 
 use swj_utils::unit_team_system;
+use crate::AnimChannel;
 
-use crate::cocos2d_anim::{AnimationMode, Cocos2dAnimator, Cocos2dAnimatorPlayer};
+use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimatorPlayer, EventType};
 use crate::game::GameStates::{Playing, PrepareLoad};
 use crate::map::CurrentMapInfo;
 use crate::resource::{ConfigResource, ConfigResourceParse};
-use crate::resource::action::{Action, ActionType};
+use crate::resource::action::{Action, ActionType, DamageEvent};
+use crate::resource::action::melee::MeleeDamageCenterType;
 use crate::resource::ResourcePath;
 use crate::unit::UnitState::Moving;
-
-// macro_rules! unit_team_system {
-//     () => {
-//         generate_combinations!
-//     };
-// }
 
 pub struct UnitPlugin;
 
@@ -30,7 +27,12 @@ impl Plugin for UnitPlugin {
             .add_systems(Update,
                          (
                              unit_z_order,
-                             unit_intent_change
+                             unit_intent_change,
+                             performing_action,
+                             enemy_removed,
+                             health_system,
+                             unit_anim_event,
+                             unit_die,
                          ).run_if(in_state(Playing)),
             )
             .add_systems(Update, unit_team_system!(
@@ -38,8 +40,9 @@ impl Plugin for UnitPlugin {
                 UnitTeamRight;
                 unit_no_attack_sys,
                 unit_attack_enemy,
-                search_enemy,
-                who_attack_me_system,
+                find_enemy,
+                enemy_added,
+                action_anim_event,
             ).run_if(in_state(Playing)))
             .add_systems(PreUpdate,
                          (
@@ -54,25 +57,6 @@ impl Plugin for UnitPlugin {
 #[derive(Component, Default, Deref, DerefMut)]
 struct WhoAttackMe(u32);
 
-fn who_attack_me_system<T: Component>(
-    mut query: Query<(Entity, &mut WhoAttackMe), With<T>>,
-    enemy_query: Query<&Enemy, Without<T>>,
-) {
-    let mut enemy_atk_map = HashMap::new();
-    for enemy in enemy_query.iter() {
-        *enemy_atk_map.entry(enemy.target).or_insert(0) += 1;
-    }
-
-    for (entity, mut who_attack_me) in query.iter_mut() {
-        if let Some(count) = enemy_atk_map.get(&entity) {
-            who_attack_me.0 = *count;
-        } else {
-            who_attack_me.0 = 0;
-        }
-    }
-}
-
-
 #[derive(Resource, Default)]
 pub struct UnitSearchMap {
     lefts: Vec<(Entity, Vec2)>,
@@ -84,34 +68,37 @@ fn unit_search_prepare_sys(
     left_query: Query<(Entity, &Transform, &WhoAttackMe), (With<UnitTeamLeft>, With<Unit>)>,
     right_query: Query<(Entity, &Transform, &WhoAttackMe), (With<UnitTeamRight>, With<Unit>)>,
 ) {
-    fn get_sort_key(a: &(Entity, Vec2, u32), left: bool) -> f32 {
+    fn get_sort_key(pos: &Vec2, atk_me: u32, left: bool) -> f32 {
+        let offset_factor = 455.5;
         let x_offset = if left {
-            -(a.2 as f32 * 1.5)
+            -(atk_me as f32 * offset_factor)
         } else {
-            a.2 as f32 * 1.5
+            atk_me as f32 * offset_factor
         };
 
-        a.1.x + x_offset
+        pos.x + x_offset
     }
 
     let mut lefts = Vec::with_capacity(left_query.iter().count());
     for (entity, transform, atk_me) in left_query.iter() {
-        lefts.push((entity, transform.translation.truncate(), atk_me.0));
+        let pos = transform.translation.truncate();
+        lefts.push((entity, pos, get_sort_key(&pos, atk_me.0, true)));
     }
     lefts.sort_by(|a, b| {
-        let a_key = get_sort_key(a, true);
-        let b_key = get_sort_key(b, true);
+        let a_key = a.2;
+        let b_key = b.2;
         a_key.partial_cmp(&b_key).unwrap().reverse()
     });
     search_map.lefts = lefts.iter().map(|(entity, pos, _)| (*entity, *pos)).collect();
 
     let mut rights = Vec::with_capacity(right_query.iter().count());
     for (entity, transform, atk_me) in right_query.iter() {
-        rights.push((entity, transform.translation.truncate(), atk_me.0));
+        let pos = transform.translation.truncate();
+        rights.push((entity, pos, get_sort_key(&pos, atk_me.0, false)));
     }
     rights.sort_by(|a, b| {
-        let a_key = get_sort_key(a, false);
-        let b_key = get_sort_key(b, false);
+        let a_key = a.2;
+        let b_key = b.2;
         a_key.partial_cmp(&b_key).unwrap()
     });
     search_map.rights = rights.iter().map(|(entity, pos, _)| (*entity, *pos)).collect();
@@ -139,7 +126,7 @@ fn load_unit_config(
     });
 }
 
-fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) {
+fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) -> Option<AnimationFaceDir> {
     let dir = *dest_pos - transform.translation.truncate();
     let dir = if dir.length() < speed {
         dir
@@ -148,6 +135,17 @@ fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) {
     };
 
     transform.translation += dir.extend(0.);
+
+
+    if dir.x > 1e-5 {
+        if dir.x > 0.0 {
+            Some(AnimationFaceDir::Right)
+        } else {
+            Some(AnimationFaceDir::Left)
+        }
+    } else {
+        None
+    }
 }
 
 const MIN_DISTANCE_DIFF: f32 = 0.1;
@@ -169,16 +167,18 @@ fn unit_no_attack_sys<T: Component>(
                     animator.mode = AnimationMode::Loop;
                 }
 
+                let mut face_dir = None;
+
                 match *intent {
                     UnitIntent::MoveTo(pos) => {
-                        move_transform_to(&mut transform, &pos, unit.move_speed);
+                        face_dir = move_transform_to(&mut transform, &pos, unit.move_speed);
 
                         if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
                             *state = UnitState::Idle;
                         }
                     }
                     UnitIntent::AttackTo(pos) => {
-                        move_transform_to(&mut transform, &pos, unit.move_speed);
+                        face_dir = move_transform_to(&mut transform, &pos, unit.move_speed);
 
                         if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
                             *state = UnitState::Idle;
@@ -186,14 +186,14 @@ fn unit_no_attack_sys<T: Component>(
                     }
                     _ => {}
                 }
-            }
-            UnitState::Attacking => {}
-            UnitState::Dead => {
-                if anim_player.anim_name != UnitAnimName::Die.as_str() {
-                    animator.new_anim = Some(UnitAnimName::Die.into());
-                    animator.mode = AnimationMode::Once;
+
+                if let Some(face_dir) = face_dir {
+                    if face_dir != animator.face_dir {
+                        animator.face_dir = face_dir;
+                    }
                 }
             }
+            UnitState::Attacking => {}
         }
     }
 }
@@ -202,7 +202,7 @@ fn unit_attack_enemy<T: Component>(
     time: Res<Time>,
     mut commands: Commands,
     mut query: Query<(Entity, &Unit, &mut UnitState, &mut Enemy, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), (With<T>, Without<PerformingAction>)>,
-    enemy_query: Query<(&Unit, &Transform), Without<T>>,
+    enemy_query: Query<(&Unit, &Transform), (Without<T>, With<UnitState>)>,
 ) {
     for (entity, unit, mut state, mut enemy, mut transform, mut animator, anim_player) in query.iter_mut() {
         match *state {
@@ -213,18 +213,30 @@ fn unit_attack_enemy<T: Component>(
                 }
 
                 let Enemy { target, attack_range } = *enemy;
-                let target_transform = enemy_query.get(target).unwrap().1;
-                let target_pos = target_transform.translation.truncate();
-                let dir = target_pos - transform.translation.truncate();
+                let (enemy_unit, enemy_transform) = if let Ok(target) = enemy_query.get(target) {
+                    target
+                } else {
+                    commands.entity(entity).remove::<Enemy>();
+                    continue;
+                };
+                let target_pos = enemy_transform.translation.truncate();
+                let my_pos = transform.translation.truncate();
+                let dir = target_pos - my_pos;
                 let dir = if dir.length() < attack_range {
                     dir
                 } else {
                     dir.normalize() * attack_range
                 };
                 let target_pos = target_pos - dir;
-                move_transform_to(&mut transform, &target_pos, unit.move_speed);
+                // info!("move to target {:?}, attack range: {}, {:?} -> {:?}", entity,transform.translation.truncate(), target_pos, attack_range);
+                let face_dir = move_transform_to(&mut transform, &target_pos, unit.move_speed);
+                if let Some(face_dir) = face_dir {
+                    if face_dir != animator.face_dir {
+                        animator.face_dir = face_dir;
+                    }
+                }
 
-                if transform.translation.truncate().distance(target_transform.translation.truncate()) < attack_range {
+                if my_pos.distance(target_pos) < 1e-2 {
                     *state = UnitState::Attacking;
                 }
             }
@@ -232,7 +244,8 @@ fn unit_attack_enemy<T: Component>(
                 if let Ok((enemy_unit, enemy_transform)) = enemy_query.get(enemy.target) {
                     let distance = transform.translation.truncate().distance(enemy_transform.translation.truncate());
                     let mut action = None;
-                    for (name, act) in &unit.actions {
+                    for idx in 0..unit.actions.len() {
+                        let (name, act) = &unit.actions[idx];
                         if !act.is_cd_over(time.elapsed()) {
                             continue;
                         }
@@ -240,36 +253,48 @@ fn unit_attack_enemy<T: Component>(
                         match act.action_type {
                             ActionType::Melee(ref melee) => {
                                 if distance < get_melee_attack_range(unit, enemy_unit) {
-                                    action = Some((name, act));
+                                    action = Some((idx, name, act));
                                     break;
                                 }
                             }
                             ActionType::Projectile(ref projectile) => {
                                 if act.range.contains(&distance) {
-                                    action = Some((name, act));
+                                    action = Some((idx, name, act));
                                     break;
                                 }
                             }
                         }
+                    }
 
-                        // find some action that satisfy the distance
-                        if let Some((name, act)) = action {
-                            if anim_player.anim_name != name.as_str() {
-                                animator.new_anim = Some(name.clone().into());
-                                animator.mode = AnimationMode::Once;
-                            }
-                            commands.entity(entity).insert(PerformingAction(name.clone()));
+                    // find some action that satisfy the distance
+                    if let Some((idx, name, act)) = action {
+                        if anim_player.anim_name != name.as_str() {
+                            animator.new_anim = Some(name.clone().into());
+                            animator.mode = AnimationMode::Once;
+                        }
+                        commands.entity(entity).insert(PerformingAction {
+                            idx,
+                            name: name.clone(),
+                        });
 
-                            continue;
+                        if transform.translation.x > enemy_transform.translation.x {
+                            animator.face_dir = AnimationFaceDir::Left;
+                        } else {
+                            animator.face_dir = AnimationFaceDir::Right;
                         }
 
-                        // if not then find the farthest action, and move to the range
-                        let farthest_range = get_farthest_attack_range(unit, enemy_unit, time.elapsed());
-                        *state = Moving;
-                        enemy.attack_range = farthest_range;
+                        continue;
                     }
+
+                    // if not then find the farthest action, and move to the range
+                    let farthest_range = get_farthest_attack_range(unit, enemy_unit, time.elapsed());
+                    *state = Moving;
+                    enemy.attack_range = farthest_range;
+                    // info!("can not perform action on target, keep moving, {:?} -> {:?}",entity,enemy.target);
                 } else {
+                    // info!("not find target unit");
                     commands.entity(entity).remove::<Enemy>();
+                    *state = Moving;
                 }
             }
             _ => {
@@ -280,20 +305,112 @@ fn unit_attack_enemy<T: Component>(
 }
 
 #[derive(Component)]
-struct PerformingAction(String);
+struct PerformingAction {
+    idx: usize,
+    name: String,
+}
 
+fn performing_action(
+    time: Res<Time>,
+    mut query: Query<(&mut Unit, &PerformingAction, &mut Cocos2dAnimator), Added<PerformingAction>>,
+) {
+    for (mut unit, action, mut animator) in query.iter_mut() {
+        let (name, ref mut action) = &mut unit.actions[action.idx];
+        action.last_use_time = time.elapsed();
+        animator.new_anim = Some(name.clone());
+        animator.mode = AnimationMode::Once;
+        animator.event_channel = Some(AnimChannel::UnitAction.into());
+    }
+}
+
+
+fn action_anim_event<T: Component + UnitTeam>(
+    mut commands: Commands,
+    mut events: EventReader<AnimEvent>,
+    mut damage_event: EventWriter<DamageEvent>,
+    unit_search_map: Res<UnitSearchMap>,
+    query: Query<(&Unit, &UnitDamage, &Transform, &PerformingAction, &Enemy), With<T>>,
+) {
+    let mut rng = rand::thread_rng();
+
+    for AnimEvent { entity, channel, evt_type } in events.read() {
+        let channel = AnimChannel::from(*channel);
+        if !matches!(channel, AnimChannel::UnitAction) {
+            continue;
+        }
+
+        match evt_type {
+            EventType::Custom(msg) => {
+                if msg != "perform" {
+                    continue;
+                }
+                if let Ok((unit, unit_damage, transform, pa, enemy)) = query.get(entity.clone()) {
+                    let (name, action) = &unit.actions[pa.idx];
+                    match action.action_type {
+                        ActionType::Melee(ref act) => {
+                            let pos = match act.damage_center {
+                                MeleeDamageCenterType::Target => {
+                                    T::enemy_units(&unit_search_map).iter().find(|(e, _)| {
+                                        *e == enemy.target
+                                    }).unwrap().1.clone()
+                                }
+                                MeleeDamageCenterType::Src => {
+                                    transform.translation.truncate()
+                                }
+                            };
+
+                            let mut enemies = if act.damage_radius > 1e-1 {
+                                vec![enemy.target]
+                            } else {
+                                let mut enemies = T::enemies_in_range(&action.range,
+                                                                      &pos,
+                                                                      T::enemy_units(&unit_search_map),
+                                                                      100);
+                                if !enemies.contains(&enemy.target) {
+                                    enemies.push(enemy.target);
+                                }
+                                enemies
+                            };
+
+
+                            let damage = unit_damage.damage + rng.gen_range(unit_damage.damage_fluctuation_range.clone());
+                            let damage = damage * act.damage_factor * 10.;
+
+                            // info!("send damage event to enemies: {:?}", enemies);
+
+                            damage_event.send_batch(
+                                enemies.iter()
+                                    .map(|e| {
+                                        DamageEvent {
+                                            src: entity.clone(),
+                                            target: *e,
+                                            damage,
+                                        }
+                                    })
+                            );
+                        }
+                        ActionType::Projectile(ref act) => {}
+                    }
+                }
+            }
+            EventType::End => {
+                commands.entity(entity.clone()).remove::<PerformingAction>();
+            }
+        }
+    }
+}
 
 pub enum UnitAttackType {
     Melee,
-    Range,
     Magic,
+    Ranger,
 }
 
 impl UnitAttackType {
     pub fn from_int(s: i32) -> UnitAttackType {
         match s {
             1 => UnitAttackType::Melee,
-            2 => UnitAttackType::Range,
+            2 => UnitAttackType::Ranger,
             _ => UnitAttackType::Magic,
         }
     }
@@ -455,7 +572,6 @@ pub enum UnitState {
     Idle,
     Moving,
     Attacking,
-    Dead,
 }
 
 #[derive(Component)]
@@ -469,18 +585,18 @@ pub enum UnitIntent {
 #[derive(Component)]
 pub struct SearchEnemy;
 
-fn search_enemy<T: Component + UnitTeam>(
+fn find_enemy<T: Component + UnitTeam>(
     time: Res<Time>,
     mut commands: Commands,
     query: Query<(Entity, &Unit, &Transform), (With<T>, With<SearchEnemy>, Without<Enemy>)>,
-    enemy_query: Query<(&Unit, &Transform), Without<T>>,
+    enemy_query: Query<&Unit, Without<T>>,
     search_map: Res<UnitSearchMap>,
 ) {
     let enemy_units = T::enemy_units(&search_map);
     for (entity, unit, transform) in query.iter() {
         let enemy = T::enemy_in_view_range(unit.view_range, &transform.translation.truncate(), enemy_units);
         if let Some(enemy) = enemy {
-            if let Ok((enemy_unit, _)) = enemy_query.get(enemy) {
+            if let Ok(enemy_unit) = enemy_query.get(enemy) {
                 commands.entity(entity).insert(Enemy {
                     target: enemy,
                     attack_range: get_farthest_attack_range(unit, enemy_unit, time.elapsed()),
@@ -513,7 +629,7 @@ fn get_farthest_attack_range(unit: &Unit, enemy: &Unit, elapsed_time: Duration) 
         }
     }
 
-    max_range
+    max_range - 0.1
 }
 
 impl UnitIntent {
@@ -548,7 +664,7 @@ fn unit_intent_change(
 #[derive(Component)]
 pub struct UnitDamage {
     pub damage: f32,
-    pub damage_fluctuation_range: Vec2,
+    pub damage_fluctuation_range: Range<f32>,
 }
 
 #[derive(Component)]
@@ -602,7 +718,7 @@ impl UnitBundle {
             },
             damage: UnitDamage {
                 damage: unit_info.damage_base + unit_info.damage_factor * level as f32,
-                damage_fluctuation_range: Vec2::new(unit_info.damage_min_bias, unit_info.damage_max_bias),
+                damage_fluctuation_range: Range { start: unit_info.damage_min_bias, end: unit_info.damage_max_bias },
             },
             intent: UnitIntent::StandAt(Vec2::ZERO),
             who_attack_me: WhoAttackMe(0),
@@ -655,6 +771,30 @@ pub struct Enemy {
     pub attack_range: f32,
 }
 
+fn enemy_added<T: Component>(
+    query: Query<&Enemy, (Added<Enemy>, With<T>)>,
+    mut enemy_query: Query<&mut WhoAttackMe, Without<T>>,
+) {
+    for enemy in query.iter() {
+        if let Ok(mut who_attack_me) = enemy_query.get_mut(enemy.target) {
+            who_attack_me.0 += 1;
+        }
+    }
+}
+
+fn enemy_removed(
+    mut removed: RemovedComponents<Enemy>,
+    mut enemy_query: Query<&mut WhoAttackMe>,
+) {
+    for entity in removed.read() {
+        if let Ok(mut who_attack_me) = enemy_query.get_mut(entity) {
+            if who_attack_me.0 > 0 {
+                who_attack_me.0 -= 1;
+            }
+        }
+    }
+}
+
 
 #[derive(Component)]
 pub struct UnitTeamLeft;
@@ -666,6 +806,9 @@ trait UnitTeam {
     fn team_units(search_map: &UnitSearchMap) -> &Vec<(Entity, Vec2)>;
     fn enemy_units(search_map: &UnitSearchMap) -> &Vec<(Entity, Vec2)>;
     fn enemy_in_view_range(view_range: f32, pos: &Vec2, enemy_units: &Vec<(Entity, Vec2)>) -> Option<Entity>;
+
+    fn enemies_in_range(range: &Range<f32>, pos: &Vec2, enemy_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity>;
+    fn teammates_in_range(range: &Range<f32>, pos: &Vec2, team_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity>;
 }
 
 impl UnitTeam for UnitTeamLeft {
@@ -692,6 +835,55 @@ impl UnitTeam for UnitTeamLeft {
 
         None
     }
+
+    fn enemies_in_range(range: &Range<f32>, pos: &Vec2, enemy_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity> {
+        let mut enemies = vec![];
+        for (entity, enemy_pos) in enemy_units {
+            if pos.x + range.end < enemy_pos.x {
+                break;
+            }
+
+            if pos.x - range.end > enemy_pos.x {
+                continue;
+            }
+
+            info!("any one reach here ?");
+            if !range.contains(&pos.distance(*enemy_pos)) {
+                continue;
+            }
+
+            enemies.push(entity.clone());
+            if enemies.len() >= max_units {
+                break;
+            }
+        }
+
+        enemies
+    }
+
+    fn teammates_in_range(range: &Range<f32>, pos: &Vec2, team_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity> {
+        let mut teammates = vec![];
+        for (entity, team_pos) in team_units {
+            if pos.x + range.end < team_pos.x {
+                break;
+            }
+
+            if pos.x - range.end > team_pos.x {
+                continue;
+            }
+
+            if !range.contains(&pos.distance(*team_pos)) {
+                continue;
+            }
+
+            teammates.push(entity.clone());
+            if teammates.len() >= max_units {
+                break;
+            }
+        }
+
+        teammates
+    }
 }
 
 impl UnitTeam for UnitTeamRight {
@@ -717,5 +909,142 @@ impl UnitTeam for UnitTeamRight {
         }
 
         None
+    }
+
+    fn enemies_in_range(range: &Range<f32>, pos: &Vec2, enemy_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity> {
+        let mut enemies = vec![];
+        for (entity, enemy_pos) in enemy_units {
+            if pos.x - range.end > enemy_pos.x {
+                break;
+            }
+
+            if pos.x + range.end < enemy_pos.x {
+                continue;
+            }
+
+            if !range.contains(&pos.distance(*enemy_pos)) {
+                continue;
+            }
+
+            enemies.push(entity.clone());
+            if enemies.len() >= max_units {
+                break;
+            }
+        }
+
+        enemies
+    }
+
+    fn teammates_in_range(range: &Range<f32>, pos: &Vec2, team_units: &Vec<(Entity, Vec2)>, max_units: usize) -> Vec<Entity> {
+        let mut teammates = vec![];
+        for (entity, team_pos) in team_units {
+            if pos.x - range.end > team_pos.x {
+                break;
+            }
+
+            if pos.x + range.end < team_pos.x {
+                continue;
+            }
+
+            if !range.contains(&pos.distance(*team_pos)) {
+                continue;
+            }
+
+            teammates.push(entity.clone());
+            if teammates.len() >= max_units {
+                break;
+            }
+        }
+
+        teammates
+    }
+}
+
+#[derive(Bundle)]
+struct LivingUintBundle {
+    intent: UnitIntent,
+    enemy: Enemy,
+    state: UnitState,
+    who_attack_me: WhoAttackMe,
+    search_enemy: SearchEnemy,
+}
+
+#[derive(Component)]
+struct UnitDead;
+
+fn health_system(
+    mut commands: Commands,
+    mut query: Query<(Entity, &UnitHealth), (Changed<UnitHealth>)>,
+) {
+    for (entity, health) in query.iter_mut() {
+        if health.health <= 0.0 {
+            commands.entity(entity)
+                .remove::<LivingUintBundle>()
+                .insert(UnitDead);
+        }
+    }
+}
+
+fn unit_die(
+    mut query: Query<&mut Cocos2dAnimator, (Added<UnitDead>, With<Unit>)>,
+) {
+    for mut animator in query.iter_mut() {
+        // info!("one unit die");
+        animator.new_anim = Some(UnitAnimName::Die.into());
+        animator.mode = AnimationMode::Once;
+        animator.event_channel = Some(AnimChannel::Unit.into());
+    }
+}
+
+fn unit_anim_event(
+    mut commands: Commands,
+    mut events: EventReader<AnimEvent>,
+    mut query: Query<(Option<&mut UnitState>, Option<&UnitIntent>, &Cocos2dAnimatorPlayer)>,
+) {
+    for evt in events.read() {
+        let AnimEvent { entity, channel, evt_type } = evt;
+        let channel = AnimChannel::from(*channel);
+        if !matches!(channel, AnimChannel::Unit) {
+            continue;
+        }
+
+        match evt_type {
+            EventType::End => {
+                if let Ok((mut state, intent, anim_player)) = query.get_mut(entity.clone()) {
+                    match anim_player.anim_name.as_str() {
+                        "die" => {
+                            commands.entity(entity.clone()).despawn_recursive();
+                        }
+                        "born" => {
+                            let intent = if let Some(intent) = intent {
+                                intent
+                            } else {
+                                warn!("unit born but no intent");
+                                continue;
+                            };
+
+                            let mut state = if let Some(state) = state {
+                                state
+                            } else {
+                                warn!("unit born but no state");
+                                continue;
+                            };
+
+                            match *intent {
+                                UnitIntent::MoveTo(_) => {
+                                    *state = Moving;
+                                }
+                                UnitIntent::AttackTo(_) => {
+                                    *state = Moving;
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }

@@ -112,8 +112,12 @@ fn damage_system(
     mut health: Query<&mut UnitHealth>,
 ) {
     for DamageEvent { src: _, target, damage } in events.read() {
+        // info!("receive damage {} from {:?}", damage, target);
         if let Ok(mut health) = health.get_mut(*target) {
-            health.health -= *damage;
+            // info!("damage {} to {:?}", damage, target);
+            if health.health > 0.0 {
+                health.health -= *damage;
+            }
         }
     }
 }

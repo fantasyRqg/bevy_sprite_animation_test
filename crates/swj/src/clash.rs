@@ -27,9 +27,74 @@ impl Plugin for ClashPlugin {
                 check_res_load_finished.run_if(in_state(Loading)),
                 generate_unit.run_if(in_state(Playing)),
             ))
+            // .add_systems(OnEnter(Playing), debug_uint_gen)
             .add_systems(OnEnter(PrepareScene), prepare_scene)
         ;
     }
+}
+
+
+fn debug_uint_gen(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut unit_gen_res: ResMut<UnitGenRes>,
+    loaded_units: Res<LoadedUnits>,
+    config_res: Res<ConfigResource>,
+    asset_server: Res<AssetServer>,
+) {
+    let mut rng = thread_rng();
+
+    let left_gen_speed = unit_gen_res.left_gen_speed;
+    let right_gen_speed = unit_gen_res.right_gen_speed;
+
+    let left_gen_rect = unit_gen_res.left_gen_rect;
+    let right_gen_rect = unit_gen_res.right_gen_rect;
+
+    let pos = random_pos_in_rect(&left_gen_rect, &mut rng);
+    // let name = loaded_units.left_units.choose(&mut rng).unwrap();
+    let name = "malitia_warrior";
+    let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
+    unit_bundle.intent.attack_to(vec2(MAP_SIZE.x, pos.y));
+    let unit_info = config_res.units.get(name).unwrap();
+    commands.spawn((
+        SpatialBundle {
+            transform: Transform::from_translation(pos.extend(0.)),
+            ..default()
+        },
+        unit_bundle,
+        UnitTeamLeft,
+        Cocos2dAnimator {
+            anim_handle: asset_server.load(unit_info.animation_name.anim_path()),
+            face_dir: AnimationFaceDir::Right,
+            event_channel: Some(AnimChannel::Unit.into()),
+            new_anim: Some(UnitAnimName::Born.into()),
+            mode: AnimationMode::Once,
+            ..default()
+        },
+    ));
+
+    let pos = random_pos_in_rect(&right_gen_rect, &mut rng);
+    // let name = loaded_units.right_units.choose(&mut rng).unwrap();
+    let name = "barbarian_infantry";
+    let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
+    unit_bundle.intent.attack_to(vec2(0., pos.y));
+    let unit_info = config_res.units.get(name).unwrap();
+    commands.spawn((
+        SpatialBundle {
+            transform: Transform::from_translation(pos.extend(0.)),
+            ..default()
+        },
+        unit_bundle,
+        UnitTeamRight,
+        Cocos2dAnimator {
+            anim_handle: asset_server.load(unit_info.animation_name.anim_path()),
+            face_dir: AnimationFaceDir::Left,
+            event_channel: Some(AnimChannel::Unit.into()),
+            new_anim: Some(UnitAnimName::Born.into()),
+            mode: AnimationMode::Once,
+            ..default()
+        },
+    ));
 }
 
 #[derive(Resource, Default)]
@@ -64,14 +129,14 @@ fn check_preload_finished(
     state.set(Loading);
 
     let left_units = vec![
-        "archer_soldier",
+        // "archer_soldier",
         "malitia_warrior",
     ]
         .iter()
         .map(|s| s.to_string()).collect();
 
     let right_units = vec![
-        "barbarian_archer",
+        // "barbarian_archer",
         "barbarian_infantry",
     ]
         .iter()
@@ -171,7 +236,7 @@ impl Default for UnitGenRes {
         let right_size = vec2(x_offset, 600.0);
 
         UnitGenRes {
-            timer: Timer::from_seconds(0.2, Repeating),
+            timer: Timer::from_seconds(1., Repeating),
             left_gen_speed: 5,
             right_gen_speed: 5,
             left_gen_rect: Rect::new(left_centre.x - left_size.x / 2.0, left_centre.y - left_size.y / 2.0, left_centre.x + left_size.x / 2.0, left_centre.y + left_size.y / 2.0),
@@ -240,7 +305,16 @@ fn generate_unit(
         let pos = random_pos_in_rect(&right_gen_rect, &mut rng);
         let name = loaded_units.right_units.choose(&mut rng).unwrap();
         let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
-        unit_bundle.intent.attack_to(vec2(0., pos.y));
+
+        let atk_y = if pos.y < left_gen_rect.min.y {
+            left_gen_rect.min.y
+        } else if pos.y > left_gen_rect.max.y {
+            left_gen_rect.max.y
+        } else {
+            pos.y
+        };
+
+        unit_bundle.intent.attack_to(vec2(0., atk_y));
         let unit_info = config_res.units.get(name).unwrap();
         commands.spawn((
             SpatialBundle {
