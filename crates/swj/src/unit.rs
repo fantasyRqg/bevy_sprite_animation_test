@@ -11,6 +11,7 @@ use swj_utils::unit_team_system;
 use crate::AnimChannel;
 
 use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimatorPlayer, EventType};
+use crate::cocos2d_anim::anim::{Cocos2dAnimAsset, FrameEvent};
 use crate::game::GameStates::{Playing, PrepareLoad};
 use crate::map::CurrentMapInfo;
 use crate::resource::{ConfigResource, ConfigResourceParse};
@@ -65,7 +66,6 @@ fn debug_system(
     mut cur_pos: Local<Vec2>,
     mut drag: Local<Option<Entity>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
-    map_info: Res<CurrentMapInfo>,
 ) {
     let (camera, camera_trans) = camera_query.single();
 
@@ -417,7 +417,7 @@ fn action_anim_event<T: Component + UnitTeam>(
 
         match evt_type {
             EventType::Custom(msg) => {
-                if msg != "perform" {
+                if !matches!(msg, FrameEvent::Perform) {
                     continue;
                 }
                 if let Ok((unit, unit_damage, transform, pa, enemy)) = query.get(entity.clone()) {

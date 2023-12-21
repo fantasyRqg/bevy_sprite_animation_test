@@ -61,6 +61,7 @@ pub struct MeleeInfo {
     pub effect_sound: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct MeleeAct {
     pub damage_factor: f32,
     pub damage_center: MeleeDamageCenterType,

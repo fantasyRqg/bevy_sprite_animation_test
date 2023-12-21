@@ -130,13 +130,14 @@ pub struct Projectile {
     pub speed: f32,
     pub damage: f32,
     pub target: TargetType,
-    pub emitter: Entity,
+    pub src: Entity,
 }
 
+#[derive(Debug)]
 pub struct ProjectileAct{
     pub base_damage: f32,
     pub damage_factor: f32,
-    pub bullet_animation_name: Handle<Cocos2dAnimAsset>,
+    pub bullet_animation_handle: Handle<Cocos2dAnimAsset>,
     pub fly_speed: f32,
     pub bullet_height_factor: f32,
     pub bullet_height_base: f32,

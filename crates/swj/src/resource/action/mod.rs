@@ -34,6 +34,7 @@ impl Plugin for ActionPlugin {
     }
 }
 
+#[derive(Debug)]
 pub enum ActionType {
     Melee(MeleeAct),
     Projectile(ProjectileAct),
@@ -83,7 +84,7 @@ impl Action {
             action_type: ActionType::Projectile(ProjectileAct {
                 base_damage: info.base_damage,
                 damage_factor: info.damage_factor,
-                bullet_animation_name: asset_server.load(info.bullet_animation_name.anim_path()),
+                bullet_animation_handle: asset_server.load(info.bullet_animation_name.anim_path()),
                 fly_speed: info.fly_speed,
                 bullet_height_factor: info.bullet_height_factor,
                 bullet_height_base: info.bullet_height_base,

@@ -10,7 +10,7 @@ use bevy::time::TimerMode::Repeating;
 use anim::Cocos2dAnimAsset;
 use sprite_sheet::{PlistSpriteAssetLoader, PlistSpriteFrameAsset};
 
-use crate::cocos2d_anim::anim::Cocos2dAnimAssetLoader;
+use crate::cocos2d_anim::anim::{Cocos2dAnimAssetLoader, FrameEvent};
 use crate::cocos2d_anim::AnimationState::Ended;
 use crate::cocos2d_anim::EventType::{Custom, End};
 
@@ -109,7 +109,7 @@ pub struct CocoAnim2dAnimatorLayer {
 
 #[derive(Debug)]
 pub enum EventType {
-    Custom(String),
+    Custom(FrameEvent),
     End,
 }
 
