@@ -6,6 +6,7 @@ use crate::clash::ClashPlugin;
 use crate::cocos2d_anim::Cocos2dAnimPlugin;
 use crate::map::MapPlugin;
 use crate::resource::ResourcePlugin;
+use crate::sprite_debug::SpriteDebugPlugin;
 use crate::unit::UnitPlugin;
 
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
@@ -27,7 +28,7 @@ impl Plugin for GamePlugin {
             .add_plugins((
                 Cocos2dAnimPlugin,
                 // PfControllerPlugin,
-                // SpriteDebugPlugin,
+                SpriteDebugPlugin,
                 ResourcePlugin,
                 UnitPlugin,
                 MapPlugin,
@@ -35,9 +36,9 @@ impl Plugin for GamePlugin {
             ))
 
             .add_systems(Startup, setup)
-            // .add_systems(Update, (
-            //     debug_pos
-            // ))
+        // .add_systems(Update, (
+        //     debug_pos
+        // ))
         ;
     }
 }

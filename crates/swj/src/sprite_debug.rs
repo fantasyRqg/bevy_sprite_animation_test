@@ -1,7 +1,8 @@
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 
-use crate::pf_controller::{Projectile, SpawnEvent, Unit};
+use crate::resource::action::projectile::Projectile;
+use crate::unit::Unit;
 
 pub struct SpriteDebugPlugin;
 
@@ -14,8 +15,8 @@ impl Plugin for SpriteDebugPlugin {
                 setup_ui,
             ))
             .add_systems(Update, (
-                update_sprite_count::<TextUnitCount, Unit>,
-                update_sprite_count::<TextProjectileCount, Projectile>,
+                update_sprite_count::<Unit>,
+                update_sprite_count::<Projectile>,
                 update_fps,
                 btn_reset_game,
                 btn_add_unit,
@@ -26,10 +27,17 @@ impl Plugin for SpriteDebugPlugin {
 }
 
 #[derive(Component)]
-struct TextUnitCount;
+struct CountTag<T> {
+    _marker: std::marker::PhantomData<T>,
+}
 
-#[derive(Component)]
-struct TextProjectileCount;
+impl<T> Default for CountTag<T> {
+    fn default() -> Self {
+        CountTag {
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
 
 #[derive(Component)]
 struct TextFps;
@@ -69,7 +77,7 @@ fn setup_ui(
                         color: Color::WHITE,
                     }),
                 ]),
-                TextUnitCount,
+                CountTag::<Unit>::default(),
             ));
 
 
@@ -89,7 +97,7 @@ fn setup_ui(
                         color: Color::WHITE,
                     }),
                 ]),
-                TextProjectileCount,
+                CountTag::<Projectile>::default(),
             ));
 
             parent.spawn((
@@ -123,91 +131,91 @@ fn setup_ui(
         ..Default::default()
     })
         .with_children(|parent| {
-            parent.spawn((
-                TextResetGame,
-                ButtonBundle {
-                    style: Style {
-                        width: Val::Px(150.0),
-                        height: Val::Px(65.0),
-                        border: UiRect::all(Val::Px(5.0)),
-                        // horizontally center child text
-                        justify_content: JustifyContent::Center,
-                        // vertically center child text
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    border_color: BorderColor(Color::GRAY),
-                    ..default()
-                }
-            ))
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Remove All",
-                        TextStyle {
-                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                            font_size: 20.0,
-                            color: Color::rgb(0.2, 0.1, 0.1),
-                        },
-                    ));
-                });
+            // parent.spawn((
+            //     TextResetGame,
+            //     ButtonBundle {
+            //         style: Style {
+            //             width: Val::Px(150.0),
+            //             height: Val::Px(65.0),
+            //             border: UiRect::all(Val::Px(5.0)),
+            //             // horizontally center child text
+            //             justify_content: JustifyContent::Center,
+            //             // vertically center child text
+            //             align_items: AlignItems::Center,
+            //             ..default()
+            //         },
+            //         border_color: BorderColor(Color::GRAY),
+            //         ..default()
+            //     }
+            // ))
+            //     .with_children(|parent| {
+            //         parent.spawn(TextBundle::from_section(
+            //             "Remove All",
+            //             TextStyle {
+            //                 font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+            //                 font_size: 20.0,
+            //                 color: Color::rgb(0.2, 0.1, 0.1),
+            //             },
+            //         ));
+            //     });
 
 
-            parent.spawn((
-                TextUnitCount,
-                ButtonBundle {
-                    style: Style {
-                        width: Val::Px(150.0),
-                        height: Val::Px(65.0),
-                        border: UiRect::all(Val::Px(5.0)),
-                        // horizontally center child text
-                        justify_content: JustifyContent::Center,
-                        // vertically center child text
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    border_color: BorderColor(Color::GRAY),
-                    ..default()
-                }
-            ))
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Add Unit +500",
-                        TextStyle {
-                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                            font_size: 20.0,
-                            color: Color::rgb(0.2, 0.1, 0.1),
-                        },
-                    ));
-                });
-
-
-            parent.spawn((
-                TextProjectileCount,
-                ButtonBundle {
-                    style: Style {
-                        width: Val::Px(150.0),
-                        height: Val::Px(65.0),
-                        border: UiRect::all(Val::Px(5.0)),
-                        // horizontally center child text
-                        justify_content: JustifyContent::Center,
-                        // vertically center child text
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    border_color: BorderColor(Color::GRAY),
-                    ..default()
-                }
-            ))
-                .with_children(|parent| {
-                    parent.spawn(TextBundle::from_section(
-                        "Add Projectile +500",
-                        TextStyle {
-                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                            font_size: 20.0,
-                            color: Color::rgb(0.2, 0.1, 0.1),
-                        },
-                    ));
-                });
+            // parent.spawn((
+            //     CountTag::<Unit>::default(),
+            //     ButtonBundle {
+            //         style: Style {
+            //             width: Val::Px(150.0),
+            //             height: Val::Px(65.0),
+            //             border: UiRect::all(Val::Px(5.0)),
+            //             // horizontally center child text
+            //             justify_content: JustifyContent::Center,
+            //             // vertically center child text
+            //             align_items: AlignItems::Center,
+            //             ..default()
+            //         },
+            //         border_color: BorderColor(Color::GRAY),
+            //         ..default()
+            //     }
+            // ))
+            //     .with_children(|parent| {
+            //         parent.spawn(TextBundle::from_section(
+            //             "Add Unit +500",
+            //             TextStyle {
+            //                 font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+            //                 font_size: 20.0,
+            //                 color: Color::rgb(0.2, 0.1, 0.1),
+            //             },
+            //         ));
+            //     });
+            //
+            //
+            // parent.spawn((
+            //     CountTag::<Projectile>::default(),
+            //     ButtonBundle {
+            //         style: Style {
+            //             width: Val::Px(150.0),
+            //             height: Val::Px(65.0),
+            //             border: UiRect::all(Val::Px(5.0)),
+            //             // horizontally center child text
+            //             justify_content: JustifyContent::Center,
+            //             // vertically center child text
+            //             align_items: AlignItems::Center,
+            //             ..default()
+            //         },
+            //         border_color: BorderColor(Color::GRAY),
+            //         ..default()
+            //     }
+            // ))
+            //     .with_children(|parent| {
+            //         parent.spawn(TextBundle::from_section(
+            //             "Add Projectile +500",
+            //             TextStyle {
+            //                 font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+            //                 font_size: 20.0,
+            //                 color: Color::rgb(0.2, 0.1, 0.1),
+            //             },
+            //         ));
+            //     });
         });
 }
 
@@ -223,9 +231,9 @@ fn update_fps(
     }
 }
 
-fn update_sprite_count<T: Component, E: Component>(
-    mut query_ui: Query<&mut Text, With<T>>,
-    query_sprite: Query<&E>,
+fn update_sprite_count<T: Component>(
+    mut query_ui: Query<&mut Text, With<CountTag<T>>>,
+    query_sprite: Query<&T>,
 ) {
     let num = query_sprite.iter().count();
     let mut text = query_ui.single_mut();
@@ -250,21 +258,21 @@ fn btn_reset_game(
 }
 
 fn btn_add_unit(
-    mut events: EventWriter<SpawnEvent>,
-    btn_query: Query<&Interaction, (Changed<Interaction>, With<TextUnitCount>)>,
+    // mut events: EventWriter<SpawnEvent>,
+    // btn_query: Query<&Interaction, (Changed<Interaction>, With<TextUnitCount>)>,
 ) {
-    let interaction = btn_query.get_single();
-    if let Ok(Interaction::Pressed) = interaction {
-        events.send(SpawnEvent::Unit(500));
-    }
+    // let interaction = btn_query.get_single();
+    // if let Ok(Interaction::Pressed) = interaction {
+    //     events.send(SpawnEvent::Unit(500));
+    // }
 }
 
 fn btn_add_projectile(
-    mut events: EventWriter<SpawnEvent>,
-    btn_query: Query<&Interaction, (Changed<Interaction>, With<TextProjectileCount>)>,
+    // mut events: EventWriter<SpawnEvent>,
+    // btn_query: Query<&Interaction, (Changed<Interaction>, With<TextProjectileCount>)>,
 ) {
-    let interaction = btn_query.get_single();
-    if let Ok(Interaction::Pressed) = interaction {
-        events.send(SpawnEvent::Projectile(500));
-    }
+    // let interaction = btn_query.get_single();
+    // if let Ok(Interaction::Pressed) = interaction {
+    //     events.send(SpawnEvent::Projectile(500));
+    // }
 }

@@ -6,12 +6,14 @@ use bevy::{
 };
 use bevy::asset::AsyncReadExt;
 use bevy::input::mouse::MouseWheel;
+use bevy::input::touch::TouchPhase;
 use bevy::input::touchpad::TouchpadMagnify;
+use bevy::math::vec2;
 use bevy::prelude::shape::Quad;
 use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::texture::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::sprite::Anchor;
-use bevy::utils::thiserror;
+use bevy::utils::{HashMap, thiserror};
 use serde_xml::value::{Content, Element};
 use thiserror::Error;
 
@@ -29,6 +31,7 @@ impl Plugin for MapPlugin {
             .add_systems(Update,
                          (
                              mac_view_move,
+                             touch_view_move,
                              (
                                  map_system,
                                  mv_camera_to_map,
@@ -83,6 +86,81 @@ fn mac_view_move(
             transform.translation.y += mwe.y;
 
             adjust_camera(camera_move_limit.as_ref(), transform.as_mut(), project.as_ref());
+        }
+    }
+}
+
+
+fn touch_view_move(
+    mut touch_events: EventReader<TouchInput>,
+    camera_move_limit: Res<CameraMoveLimit>,
+    mut camera_query: Query<(&mut Transform, &mut OrthographicProjection)>,
+    mut touch_tracker: Local<HashMap<u64, Vec2>>,
+    win_query: Query<&Window>,
+) {
+    let win = win_query.single();
+    let win_size = vec2(win.resolution.width(), win.resolution.height());
+    for evt in touch_events.read() {
+        for (mut transform, mut project) in camera_query.iter_mut() {
+            match evt.phase {
+                TouchPhase::Started => {
+                    if touch_tracker.len() == 2 {
+                        continue;
+                    }
+
+                    touch_tracker.insert(evt.id, evt.position);
+                }
+                TouchPhase::Moved => {
+                    if touch_tracker.len() == 1 {
+                        // translate
+                        if let Some(last_pos) = touch_tracker.get_mut(&evt.id) {
+                            let pos = evt.position;
+                            let delta = pos - *last_pos;
+                            transform.translation.x -= delta.x * project.scale;
+                            transform.translation.y += delta.y * project.scale;
+                            *last_pos = pos;
+
+                            adjust_camera(camera_move_limit.as_ref(), transform.as_mut(), project.as_ref());
+                        }
+                    } else if touch_tracker.len() == 2 {
+                        // scale
+
+                        let mv_touch = if let Some(pos) = touch_tracker.get(&evt.id) {
+                            *pos
+                        } else {
+                            continue;
+                        };
+
+                        let fixed_touch = *touch_tracker.iter().find(|(id, _)| **id != evt.id).unwrap().1;
+
+                        let new_mv_touch = evt.position;
+
+                        let scale = ((fixed_touch - new_mv_touch).length() - (fixed_touch - mv_touch).length()) / (fixed_touch - mv_touch).length();
+                        touch_tracker.insert(evt.id, new_mv_touch);
+
+                        let view_center = win_size / 2.0;
+                        let mut touch_center = (fixed_touch + new_mv_touch) / 2.0;
+                        // touch_center.y = win_size.y - touch_center.y;
+
+                        let delta = (touch_center - view_center) * project.scale;
+                        let delta = (touch_center - view_center) * (project.scale - scale) - delta;
+                        transform.translation.x -= delta.x;
+                        transform.translation.y += delta.y;
+                        project.scale -= scale;
+
+                        if project.scale < camera_move_limit.scale_min {
+                            project.scale = camera_move_limit.scale_min;
+                        } else if project.scale > camera_move_limit.scale_max {
+                            project.scale = camera_move_limit.scale_max;
+                        }
+
+                        adjust_camera(&camera_move_limit, &mut transform, &project);
+                    }
+                }
+                TouchPhase::Canceled | TouchPhase::Ended => {
+                    touch_tracker.remove(&evt.id);
+                }
+            }
         }
     }
 }

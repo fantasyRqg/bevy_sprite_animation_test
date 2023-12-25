@@ -12,6 +12,7 @@ use crate::game::GameStates;
 use crate::game::GameStates::{Loading, Playing, PrepareLoad, PrepareScene};
 use crate::map::{TmxMap, TmxMapAsset};
 use crate::resource::{ConfigLoaded, ConfigResource, ResourcePath};
+use crate::sprite_debug::SpriteDebugPlugin;
 use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitTeamLeft, UnitTeamRight};
 
 pub struct ClashPlugin;
@@ -27,7 +28,6 @@ impl Plugin for ClashPlugin {
                 check_res_load_finished.run_if(in_state(Loading)),
                 generate_unit.run_if(in_state(Playing)),
             ))
-            // .add_systems(OnEnter(Playing), debug_uint_gen)
             .add_systems(OnEnter(PrepareScene), prepare_scene)
         ;
     }
@@ -52,7 +52,8 @@ fn debug_uint_gen(
 
     let pos = random_pos_in_rect(&left_gen_rect, &mut rng);
     // let name = loaded_units.left_units.choose(&mut rng).unwrap();
-    let name = "malitia_warrior";
+    let name = "archer_soldier";
+    // let name = "malitia_warrior";
     let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
     unit_bundle.intent.attack_to(vec2(MAP_SIZE.x, pos.y));
     let unit_info = config_res.units.get(name).unwrap();
@@ -75,7 +76,7 @@ fn debug_uint_gen(
 
     let pos = random_pos_in_rect(&right_gen_rect, &mut rng);
     // let name = loaded_units.right_units.choose(&mut rng).unwrap();
-    let name = "barbarian_infantry";
+    let name = "barbarian_archer";
     let mut unit_bundle = UnitBundle::new(name, 1, &config_res, &asset_server);
     unit_bundle.intent.attack_to(vec2(0., pos.y));
     let unit_info = config_res.units.get(name).unwrap();
@@ -131,12 +132,14 @@ fn check_preload_finished(
     let left_units = vec![
         "archer_soldier",
         "malitia_warrior",
+        "malitia_warrior",
     ]
         .iter()
         .map(|s| s.to_string()).collect();
 
     let right_units = vec![
         "barbarian_archer",
+        "barbarian_infantry",
         "barbarian_infantry",
     ]
         .iter()
@@ -236,7 +239,7 @@ impl Default for UnitGenRes {
         let right_size = vec2(x_offset, 600.0);
 
         UnitGenRes {
-            timer: Timer::from_seconds(0.4, Repeating),
+            timer: Timer::from_seconds(0.2, Repeating),
             left_gen_speed: 5,
             right_gen_speed: 5,
             left_gen_rect: Rect::new(left_centre.x - left_size.x / 2.0, left_centre.y - left_size.y / 2.0, left_centre.x + left_size.x / 2.0, left_centre.y + left_size.y / 2.0),

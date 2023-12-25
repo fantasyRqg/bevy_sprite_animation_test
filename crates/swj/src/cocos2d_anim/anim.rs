@@ -82,7 +82,6 @@ pub struct Cocos2dAnimMove {
 pub struct Cocos2dAnimAsset {
     pub animation: HashMap<String, Cocos2dAnimMove>,
     plist_handles: Vec<Handle<PlistSpriteFrameAsset>>,
-    pub content_size: Vec2,
 }
 
 #[non_exhaustive]
@@ -252,15 +251,20 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                                 if msg == "perform" {
                                     Some(FrameEvent::Perform)
                                 } else if msg.starts_with("perform#") {
-                                    let pos = msg[8..].split(",")
-                                        .map(|s| s.parse::<f32>().unwrap())
-                                        .collect::<Vec<f32>>();
-                                    if pos.len() != 2 {
-                                        warn!("perform# event format error: {}", msg);
-                                        None
+                                    let perform_offset = if let Some(offset) = frame.get("perform_offset") {
+                                        let offset_str = offset.as_str().unwrap();
+                                        let offset = offset_str.split(",").map(|s| s.parse::<f32>().unwrap()).collect::<Vec<f32>>();
+                                        if offset.len() != 2 {
+                                            panic!("perform# event format error: {}, perform_offset: {}, should have 2 values", msg, offset_str);
+                                        }
+                                        Vec2::new(offset[0], offset[1])
                                     } else {
-                                        Some(FrameEvent::PerformAt(vec2(pos[0], pos[1])))
-                                    }
+                                        warn!("perform# event format error: {}, perform# should have perform_offset", msg);
+                                        Vec2::ZERO
+                                    };
+                                    // info!("perform# event: {}, perform_offset: {:?}", msg, perform_offset);
+                                    Some(FrameEvent::PerformAt(translate.truncate() + perform_offset))
+                                    // Some(FrameEvent::PerformAt(perform_offset))
                                 } else {
                                     Some(FrameEvent::Other(msg))
                                 }
@@ -308,7 +312,6 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
 
 
             let mut animation = HashMap::new();
-            let mut content_size = Vec2::ZERO;
 
             for (name, mbd) in move_bone_data {
                 let mut layer_map = HashMap::new();
@@ -325,13 +328,6 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                         let sprite_frame = &sprite_sheet.frames[sprite_idx];
                         let mut offset = Vec2::from(sprite_frame.offset);
                         let frame_size = Vec2::from(sprite_frame.source_size);
-
-                        if frame_size.x > content_size.x {
-                            content_size.x = frame_size.x;
-                        }
-                        if frame_size.y > content_size.y {
-                            content_size.y = frame_size.y;
-                        }
 
                         let frame_center = frame_size / 2.0;
                         let anchor = frame_size * vec2(tex_data.px, tex_data.py);
@@ -379,7 +375,6 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
             Ok(Cocos2dAnimAsset {
                 animation,
                 plist_handles,
-                content_size,
             })
         })
     }

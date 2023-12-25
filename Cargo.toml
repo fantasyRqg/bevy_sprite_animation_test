@@ -27,7 +27,6 @@ members = [
 [lib]
 name = "rust_sprite"
 crate-type = ["cdylib", ]
-proc-macro = true
 
 
 [package.metadata.android.sdk]

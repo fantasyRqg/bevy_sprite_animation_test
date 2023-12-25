@@ -1,22 +1,25 @@
 use std::ops::Range;
 use std::time::Duration;
+
 use bevy::input::ButtonState;
 use bevy::input::mouse::MouseButtonInput;
-
+use bevy::math::vec2;
 use bevy::prelude::*;
 use rand::Rng;
+use rand::rngs::ThreadRng;
 use serde_json::Value;
 
 use swj_utils::unit_team_system;
-use crate::AnimChannel;
 
+use crate::AnimChannel;
 use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimatorPlayer, EventType};
-use crate::cocos2d_anim::anim::{Cocos2dAnimAsset, FrameEvent};
+use crate::cocos2d_anim::anim::FrameEvent;
 use crate::game::GameStates::{Playing, PrepareLoad};
 use crate::map::CurrentMapInfo;
 use crate::resource::{ConfigResource, ConfigResourceParse};
 use crate::resource::action::{Action, ActionType, DamageEvent};
 use crate::resource::action::melee::MeleeDamageCenterType;
+use crate::resource::action::projectile::{Projectile, ProjectileFly, ProjectileToFixedTarget, TargetType};
 use crate::resource::ResourcePath;
 use crate::unit::UnitState::Moving;
 
@@ -202,14 +205,17 @@ fn load_unit_config(
     });
 }
 
-fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) -> Option<AnimationFaceDir> {
+fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, unit_move: &mut UnitMove, time_delta: f32) -> Option<AnimationFaceDir> {
     let dir = *dest_pos - transform.translation.truncate();
-    let dir = if dir.length() < speed {
+    let distance = unit_move.speed * time_delta;
+    // info!("move distance {}, dir: {:?}, speed: {}, time_delta: {}", distance, dir, unit_move.speed, time_delta);
+    let dir = if dir.length() <= distance {
         dir
     } else {
-        dir.normalize() * speed
+        dir.normalize() * distance
     };
 
+    unit_move.dir = dir;
     transform.translation += dir.extend(0.);
 
 
@@ -227,9 +233,10 @@ fn move_transform_to(transform: &mut Transform, dest_pos: &Vec2, speed: f32) -> 
 const MIN_DISTANCE_DIFF: f32 = 0.1;
 
 fn unit_no_attack_sys<T: Component>(
-    mut query: Query<(&Unit, &mut UnitState, &UnitIntent, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), (With<T>, Without<Enemy>)>,
+    time: Res<Time>,
+    mut query: Query<(&mut UnitMove, &mut UnitState, &UnitIntent, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), (With<T>, Without<Enemy>)>,
 ) {
-    for (unit, mut state, intent, mut transform, mut animator, anim_player) in query.iter_mut() {
+    for (mut unit_move, mut state, intent, mut transform, mut animator, anim_player) in query.iter_mut() {
         match *state {
             UnitState::Idle => {
                 if anim_player.anim_name != UnitAnimName::Stand.as_str() {
@@ -247,14 +254,14 @@ fn unit_no_attack_sys<T: Component>(
 
                 match *intent {
                     UnitIntent::MoveTo(pos) => {
-                        face_dir = move_transform_to(&mut transform, &pos, unit.move_speed);
+                        face_dir = move_transform_to(&mut transform, &pos, &mut unit_move, time.delta_seconds());
 
                         if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
                             *state = UnitState::Idle;
                         }
                     }
                     UnitIntent::AttackTo(pos) => {
-                        face_dir = move_transform_to(&mut transform, &pos, unit.move_speed);
+                        face_dir = move_transform_to(&mut transform, &pos, &mut unit_move, time.delta_seconds());
 
                         if transform.translation.truncate().distance(pos) < MIN_DISTANCE_DIFF {
                             *state = UnitState::Idle;
@@ -277,10 +284,10 @@ fn unit_no_attack_sys<T: Component>(
 fn unit_attack_enemy<T: Component>(
     time: Res<Time>,
     mut commands: Commands,
-    mut query: Query<(Entity, &Unit, &mut UnitState, &mut Enemy, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), (With<T>, Without<PerformingAction>)>,
+    mut query: Query<(Entity, &Unit, &mut UnitMove, &mut UnitState, &mut Enemy, &mut Transform, &mut Cocos2dAnimator, &Cocos2dAnimatorPlayer), (With<T>, Without<PerformingAction>)>,
     enemy_query: Query<(&Unit, &Transform), (Without<T>, With<UnitState>)>,
 ) {
-    for (entity, unit, mut state, mut enemy, mut transform, mut animator, anim_player) in query.iter_mut() {
+    for (entity, unit, mut unit_move, mut state, mut enemy, mut transform, mut animator, anim_player) in query.iter_mut() {
         match *state {
             UnitState::Moving => {
                 if anim_player.anim_name != UnitAnimName::Run.as_str() {
@@ -305,7 +312,7 @@ fn unit_attack_enemy<T: Component>(
                 };
                 let target_pos = target_pos - dir;
                 // info!("move to target {:?}, attack range: {}, {:?} -> {:?}", entity,transform.translation.truncate(), target_pos, attack_range);
-                let face_dir = move_transform_to(&mut transform, &target_pos, unit.move_speed);
+                let face_dir = move_transform_to(&mut transform, &target_pos, &mut unit_move, time.delta_seconds());
                 if let Some(face_dir) = face_dir {
                     if face_dir != animator.face_dir {
                         animator.face_dir = face_dir;
@@ -348,7 +355,7 @@ fn unit_attack_enemy<T: Component>(
                             animator.new_anim = Some(name.clone().into());
                             animator.mode = AnimationMode::Once;
                         }
-                        commands.entity(entity).insert(PerformingAction {
+                        commands.entity(entity).try_insert(PerformingAction {
                             idx,
                             name: name.clone(),
                         });
@@ -399,13 +406,23 @@ fn performing_action(
     }
 }
 
+fn random_unit_damage(ud: &UnitDamage, rng: &mut ThreadRng) -> f32 {
+    let damage = ud.damage + rng.gen_range(ud.damage_fluctuation_range.clone());
+    damage * 3.
+}
+
+pub fn get_unit_aim_body_offset(unit: &Unit) -> Vec2 {
+    vec2(0.0, unit.body_radius) / 2.0
+}
 
 fn action_anim_event<T: Component + UnitTeam>(
+    time: Res<Time>,
     mut commands: Commands,
     mut events: EventReader<AnimEvent>,
     mut damage_event: EventWriter<DamageEvent>,
     unit_search_map: Res<UnitSearchMap>,
-    query: Query<(&Unit, &UnitDamage, &Transform, &PerformingAction, &Enemy), With<T>>,
+    query: Query<(&Unit, &UnitMove, &UnitDamage, &Transform, &PerformingAction, &Enemy), With<T>>,
+    enemy_query: Query<(&Unit, &UnitMove, &Transform), Without<T>>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -416,14 +433,17 @@ fn action_anim_event<T: Component + UnitTeam>(
         }
 
         match evt_type {
-            EventType::Custom(msg) => {
-                if !matches!(msg, FrameEvent::Perform) {
-                    continue;
-                }
-                if let Ok((unit, unit_damage, transform, pa, enemy)) = query.get(entity.clone()) {
+            EventType::Custom(frame_evt) => {
+                if let Ok((unit, unit_move, unit_damage, transform, pa, enemy)) = query.get(entity.clone()) {
                     let (name, action) = &unit.actions[pa.idx];
+                    // info!("action event: {:?}, {:?}, {:?}", entity, frame_evt, action.action_type);
+
                     match action.action_type {
                         ActionType::Melee(ref act) => {
+                            if !matches!(frame_evt, FrameEvent::Perform) {
+                                warn!("action {} not support frame event {:?}", name, frame_evt);
+                                continue;
+                            }
                             let pos = match act.damage_center {
                                 MeleeDamageCenterType::Target => {
                                     T::enemy_units(&unit_search_map).iter().find(|(e, _)| {
@@ -449,9 +469,6 @@ fn action_anim_event<T: Component + UnitTeam>(
                             };
 
 
-                            let damage = unit_damage.damage + rng.gen_range(unit_damage.damage_fluctuation_range.clone());
-                            let damage = damage * act.damage_factor * 10.;
-
                             // info!("send damage event to enemies: {:?}", enemies);
 
                             damage_event.send_batch(
@@ -460,12 +477,93 @@ fn action_anim_event<T: Component + UnitTeam>(
                                         DamageEvent {
                                             src: entity.clone(),
                                             target: *e,
-                                            damage,
+                                            damage: random_unit_damage(unit_damage, &mut rng),
                                         }
                                     })
                             );
                         }
-                        ActionType::Projectile(ref act) => {}
+                        ActionType::Projectile(ref act) => {
+                            let perform_at = match frame_evt {
+                                FrameEvent::PerformAt(pos) => {
+                                    pos.clone()
+                                }
+                                _ => {
+                                    warn!("action {} not support frame event {:?}", name, frame_evt);
+                                    continue;
+                                }
+                            };
+
+                            let (enemy_unit, enemy_move, enemy_transform) = if let Ok(enemy) = enemy_query.get(enemy.target) {
+                                enemy
+                            } else {
+                                continue;
+                            };
+                            let enemy_pos = enemy_transform.translation.truncate();
+
+                            let perform_at = if enemy_pos.x > transform.translation.x {
+                                perform_at
+                            } else {
+                                vec2(-perform_at.x, perform_at.y)
+                            };
+
+                            let spawn_pos = transform.translation.truncate() + perform_at;
+
+                            let fly_duration = enemy_pos.distance(spawn_pos) / (act.fly_speed + enemy_move.dir.length());
+
+                            let enemy_pos = enemy_pos + enemy_move.dir * fly_duration;
+                            let rand_radius = vec2(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)) * enemy_unit.body_radius * 0.3;
+                            let enemy_pos = enemy_pos + get_unit_aim_body_offset(enemy_unit) + rand_radius;
+
+                            // info!("enemy move: {:?}", enemy_move);
+                            // info!("act: {:?}, fly_duration: {}, spawn_pos: {:?}, enemy_pos: {:?}", act, fly_duration, spawn_pos, enemy_pos);
+
+                            let height = act.bullet_height_base + act.bullet_height_factor * spawn_pos.distance(enemy_pos);
+
+                            let gravity = height * 8.0 / (fly_duration * fly_duration);
+                            let init_velocity = Vec2 {
+                                x: (enemy_pos.x - spawn_pos.x) / fly_duration,
+                                y: (enemy_pos.y - spawn_pos.y + 0.5 * gravity * fly_duration * fly_duration) / fly_duration,
+                            };
+
+                            let acc = Vec2 {
+                                x: 0.,
+                                y: -gravity,
+                            };
+
+                            commands.spawn((
+                                ProjectileFly,
+                                Projectile {
+                                    damage: act.base_damage + act.damage_factor * random_unit_damage(unit_damage, &mut rng),
+                                    target: TargetType::Unit(enemy.target),
+                                    src: entity.clone(),
+                                    tolerance: enemy_unit.body_radius * 0.5,
+                                },
+                                ProjectileToFixedTarget {
+                                    acceleration: acc,
+                                    init_velocity,
+                                    dest_pos: enemy_pos,
+                                    src_pos: spawn_pos,
+                                    start_time: time.elapsed_seconds(),
+                                    fly_duration,
+                                },
+                                SpatialBundle {
+                                    transform: Transform {
+                                        translation: spawn_pos.extend(spawn_pos.y + 1000.0),
+                                        rotation: Quat::from_rotation_z(init_velocity.y.atan2(init_velocity.x)),
+                                        ..default()
+                                    },
+                                    ..default()
+                                },
+                                Cocos2dAnimator {
+                                    duration: None,
+                                    anim_handle: act.bullet_animation_handle.clone(),
+                                    mode: AnimationMode::Loop,
+                                    face_dir: AnimationFaceDir::Right,
+                                    new_anim: Some("fly".to_string()),
+                                    event_channel: Some(AnimChannel::Projectile.into()),
+                                }
+                            ));
+                        }
                     }
                 }
             }
@@ -636,8 +734,6 @@ pub struct Unit {
     pub actions: Vec<(String, Action)>,
     pub view_range: f32,
 
-    pub move_speed: f32,
-
     pub body_radius: f32,
     pub body_width: f32,
     pub body_height: f32,
@@ -673,7 +769,7 @@ fn find_enemy<T: Component + UnitTeam>(
         let enemy = T::enemy_in_view_range(unit.view_range, &transform.translation.truncate(), enemy_units);
         if let Some(enemy) = enemy {
             if let Ok(enemy_unit) = enemy_query.get(enemy) {
-                commands.entity(entity).insert(Enemy {
+                commands.entity(entity).try_insert(Enemy {
                     target: enemy,
                     attack_range: get_farthest_attack_range(unit, enemy_unit, time.elapsed()),
                 });
@@ -730,7 +826,7 @@ fn unit_intent_change(
             }
             UnitIntent::AttackTo(_) => {
                 *state = UnitState::Moving;
-                commands.entity(entity).insert(SearchEnemy);
+                commands.entity(entity).try_insert(SearchEnemy);
             }
             _ => {}
         }
@@ -750,6 +846,12 @@ pub struct UnitHealth {
 }
 
 
+#[derive(Component, Debug)]
+pub struct UnitMove {
+    pub speed: f32,
+    pub dir: Vec2,
+}
+
 #[derive(Bundle)]
 pub struct UnitBundle {
     pub unit: Unit,
@@ -758,6 +860,7 @@ pub struct UnitBundle {
     pub damage: UnitDamage,
     pub intent: UnitIntent,
     who_attack_me: WhoAttackMe,
+    unit_move: UnitMove,
 }
 
 
@@ -782,7 +885,6 @@ impl UnitBundle {
             unit: Unit {
                 actions,
                 view_range: unit_info.view,
-                move_speed: unit_info.move_speed * 0.02,
                 body_radius: unit_info.body_radius,
                 body_width: unit_info.body_width,
                 body_height: unit_info.body_height,
@@ -798,6 +900,10 @@ impl UnitBundle {
             },
             intent: UnitIntent::StandAt(Vec2::ZERO),
             who_attack_me: WhoAttackMe(0),
+            unit_move: UnitMove {
+                speed: unit_info.move_speed,
+                dir: Vec2::ZERO,
+            },
         }
     }
 }
@@ -1057,7 +1163,7 @@ fn health_system(
         if health.health <= 0.0 {
             commands.entity(entity)
                 .remove::<LivingUintBundle>()
-                .insert(UnitDead);
+                .try_insert(UnitDead);
         }
     }
 }
