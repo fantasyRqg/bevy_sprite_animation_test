@@ -235,6 +235,12 @@ fn map_system(
     for tmx_map in query.iter() {
         let tmx_map = tmx_map_asset.get(&tmx_map.handle).unwrap();
         for element in tmx_map.elements.iter() {
+            let pos = element.translate.xy();
+            let translate = if let Some(z_offset) = element.z_order_offset {
+                Vec3::new(pos.x, pos.y, -pos.y + z_offset)
+            } else {
+                Vec3::new(pos.x, pos.y, -pos.y)
+            };
             commands.spawn(SpriteBundle {
                 sprite: Sprite {
                     custom_size: Some(element.size),
@@ -242,7 +248,7 @@ fn map_system(
                     ..default()
                 },
                 texture: element.image.clone(),
-                transform: Transform::from_translation(element.translate),
+                transform: Transform::from_translation(translate),
                 ..Default::default()
             });
         }
@@ -256,7 +262,7 @@ fn map_system(
                     custom_size: Vec2::new(tmx_map.width, tmx_map.height).into(),
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(tmx_map.width / 2.0, tmx_map.height / 2.0, 0.0)),
+                transform: Transform::from_translation(Vec3::new(tmx_map.width / 2.0, tmx_map.height / 2.0, -3000.0)),
                 texture: tmx_map.background.clone(),
                 ..default()
             },
@@ -275,6 +281,7 @@ struct MapElement {
     size: Vec2,
     translate: Vec3,
     image: Handle<Image>,
+    z_order_offset: Option<f32>,
 }
 
 #[derive(Asset, TypePath, Debug, Clone)]
@@ -379,10 +386,10 @@ impl AssetLoader for TmxMapAssetLoader {
                                         let height = deco.attributes["height"].first().unwrap().parse::<i32>().unwrap();
 
 
-                                        let z = if matches!(name.as_str(),"tudui_1.png"|"tudui_2.png"|"liefeng.png") {
-                                            2.0
+                                        let z_offset = if matches!(name.as_str(),"tudui_1.png"|"tudui_2.png"|"liefeng.png") {
+                                            Some(-100.)
                                         } else {
-                                            y
+                                            None
                                         };
 
                                         let y = map_height - y;
@@ -390,8 +397,9 @@ impl AssetLoader for TmxMapAssetLoader {
                                         elements.append(&mut vec![
                                             MapElement {
                                                 size: Vec2::new(width as f32, height as f32),
-                                                translate: Vec3::new(x, y, z),
+                                                translate: Vec3::new(x, y, 0.),
                                                 image: load_context.load(load_context.path().parent().unwrap().parent().unwrap().join(name)),
+                                                z_order_offset: z_offset,
                                             }
                                         ]);
                                     }

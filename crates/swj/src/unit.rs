@@ -15,7 +15,7 @@ use crate::AnimChannel;
 use crate::cocos2d_anim::{AnimationFaceDir, AnimationMode, AnimEvent, Cocos2dAnimator, Cocos2dAnimatorPlayer, EventType};
 use crate::cocos2d_anim::anim::FrameEvent;
 use crate::game::GameStates::{Playing, PrepareLoad};
-use crate::map::CurrentMapInfo;
+use crate::game::OrderElement;
 use crate::resource::{ConfigResource, ConfigResourceParse};
 use crate::resource::action::{Action, ActionType, DamageEvent};
 use crate::resource::action::melee::MeleeDamageCenterType;
@@ -32,7 +32,6 @@ impl Plugin for UnitPlugin {
             .add_systems(OnEnter(PrepareLoad), load_unit_config)
             .add_systems(Update,
                          (
-                             unit_z_order,
                              unit_intent_change,
                              performing_action,
                              enemy_removed,
@@ -181,16 +180,6 @@ fn unit_search_prepare_sys(
         a_key.partial_cmp(&b_key).unwrap()
     });
     search_map.rights = rights.iter().map(|(entity, pos, _)| (*entity, *pos)).collect();
-}
-
-fn unit_z_order(
-    mut query: Query<&mut Transform, With<Unit>>,
-    map_info: Res<CurrentMapInfo>,
-) {
-    let map_height = map_info.size.y;
-    for mut transform in query.iter_mut() {
-        transform.translation.z = map_height - transform.translation.y;
-    }
 }
 
 
@@ -531,6 +520,9 @@ fn action_anim_event<T: Component + UnitTeam>(
                             };
 
                             commands.spawn((
+                                OrderElement {
+                                    offset: Some(1000.),
+                                },
                                 ProjectileFly,
                                 Projectile {
                                     damage: act.base_damage + act.damage_factor * random_unit_damage(unit_damage, &mut rng),
@@ -861,6 +853,7 @@ pub struct UnitBundle {
     pub intent: UnitIntent,
     who_attack_me: WhoAttackMe,
     unit_move: UnitMove,
+    pub order: OrderElement,
 }
 
 
@@ -904,6 +897,7 @@ impl UnitBundle {
                 speed: unit_info.move_speed,
                 dir: Vec2::ZERO,
             },
+            order: OrderElement::default(),
         }
     }
 }

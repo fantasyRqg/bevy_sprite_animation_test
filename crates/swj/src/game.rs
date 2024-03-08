@@ -7,6 +7,7 @@ use crate::clash::ClashPlugin;
 use crate::cocos2d_anim::Cocos2dAnimPlugin;
 use crate::map::MapPlugin;
 use crate::resource::ResourcePlugin;
+use crate::rpg::RpgPlugin;
 use crate::sprite_debug::SpriteDebugPlugin;
 use crate::unit::UnitPlugin;
 
@@ -34,13 +35,34 @@ impl Plugin for GamePlugin {
                 UnitPlugin,
                 MapPlugin,
                 ClashPlugin,
+                // RpgPlugin,
             ))
 
             .add_systems(Startup, setup)
+            .add_systems(PostUpdate, order_game_elements)
         // .add_systems(Update, (
         //     debug_pos
         // ))
         ;
+    }
+}
+
+
+#[derive(Component, Default)]
+pub struct OrderElement {
+    pub offset: Option<f32>,
+}
+
+
+fn order_game_elements(
+    mut query: Query<(&mut Transform, &OrderElement)>
+) {
+    for (mut transform, order) in query.iter_mut() {
+        if let Some(offset) = order.offset {
+            transform.translation.z = offset - transform.translation.y;
+        } else {
+            transform.translation.z = -transform.translation.y;
+        }
     }
 }
 
@@ -51,7 +73,7 @@ fn setup(mut commands: Commands,
 ) {
     commands.spawn(Camera2dBundle {
         projection: OrthographicProjection {
-            far: 2000.0,
+            far: 3000.0,
             near: -3000.0,
             ..default()
         },

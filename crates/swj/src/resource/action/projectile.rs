@@ -5,7 +5,7 @@ use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::cocos2d_anim::{AnimationMode, Cocos2dAnimator};
 
 use crate::game::GameStates::PrepareLoad;
-use crate::map::CurrentMapInfo;
+use crate::game::OrderElement;
 use crate::resource::{ConfigResource, ConfigResourceParse};
 use crate::resource::action::DamageEvent;
 use crate::unit::{get_unit_aim_body_offset, Unit, UnitState, UnitType};
@@ -45,7 +45,6 @@ fn projectile_fly_to_fixed_target(
     time: Res<Time>,
     mut commands: Commands,
     mut query: Query<(Entity, &Projectile, &ProjectileToFixedTarget, &mut Transform), With<ProjectileFly>>,
-    map_info: Res<CurrentMapInfo>,
 ) {
     for (entity, projectile, to_target, mut transform) in query.iter_mut() {
         let delta_time = if time.elapsed_seconds() - to_target.start_time > to_target.fly_duration {
@@ -57,7 +56,7 @@ fn projectile_fly_to_fixed_target(
         let delta_pos = to_target.init_velocity * delta_time + 0.5 * to_target.acceleration * delta_time * delta_time;
         let pos = to_target.src_pos + delta_pos;
 
-        transform.translation = pos.extend(map_info.size.y - pos.y + 1000.);
+        transform.translation = pos.extend(0.);
         let cur_velocity = to_target.init_velocity + to_target.acceleration * delta_time;
         transform.rotation = Quat::from_rotation_z(cur_velocity.y.atan2(cur_velocity.x));
 
@@ -69,16 +68,16 @@ fn projectile_finish_fly(
     mut commands: Commands,
     mut rm_fly: RemovedComponents<ProjectileFly>,
     mut damage_writer: EventWriter<DamageEvent>,
-    mut query: Query<(Entity, &Projectile, &mut Transform, &mut Cocos2dAnimator, &ProjectileToFixedTarget), (Without<ProjectileFly>, Without<UnitState>)>,
+    mut query: Query<(Entity, &Projectile, &mut Transform, &mut Cocos2dAnimator, &ProjectileToFixedTarget, &mut OrderElement), (Without<ProjectileFly>, Without<UnitState>)>,
     unit_query: Query<(&Unit, &Transform), With<UnitState>>,
     query_all: Query<&Projectile>,
-    map_info: Res<CurrentMapInfo>,
 ) {
     let projectile_count = query_all.iter().count();
     for entity in rm_fly.read() {
-        if let Ok((entity, projectile, mut transform, mut animator, fixed_target)) = query.get_mut(entity) {
+        if let Ok((entity, projectile, mut transform, mut animator, fixed_target, mut order)) = query.get_mut(entity) {
             let pos = transform.translation.truncate();
-            transform.translation.z = map_info.size.y - pos.y;
+            order.offset = None;
+
             match projectile.target {
                 TargetType::Unit(target_entity) => {
                     let unit_pos = if let Ok((unit, unit_transform)) = unit_query.get(target_entity) {

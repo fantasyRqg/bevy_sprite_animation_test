@@ -11,7 +11,7 @@ use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::game::GameStates;
 use crate::game::GameStates::{Loading, Playing, PrepareLoad, PrepareScene};
 use crate::map::{TmxMap, TmxMapAsset};
-use crate::resource::{ConfigLoaded, ConfigResource, ResourcePath};
+use crate::resource::{ConfigResource, ResourcePath};
 use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitTeamLeft, UnitTeamRight};
 
 pub struct ClashPlugin;
@@ -23,10 +23,10 @@ impl Plugin for ClashPlugin {
             .init_resource::<LoadedResource>()
             .init_resource::<UnitGenRes>()
             .add_systems(Update, (
-                check_preload_finished.run_if(in_state(PrepareLoad)),
                 check_res_load_finished.run_if(in_state(Loading)),
                 generate_unit.run_if(in_state(Playing)),
             ))
+            .add_systems(OnExit(PrepareLoad), check_preload_finished)
             .add_systems(OnEnter(PrepareScene), prepare_scene)
         ;
     }
@@ -118,16 +118,7 @@ fn check_preload_finished(
     mut loaded_res: ResMut<LoadedResource>,
     config_res: Res<ConfigResource>,
     asset_server: Res<AssetServer>,
-    mut cfg_event: EventReader<ConfigLoaded>,
 ) {
-    info!("check_preload_finished");
-    if cfg_event.len() == 0 {
-        return;
-    }
-
-
-    state.set(Loading);
-
     let left_units = vec![
         "archer_soldier",
         "malitia_warrior",

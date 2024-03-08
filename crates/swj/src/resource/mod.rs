@@ -5,7 +5,7 @@ use bevy::prelude::{Plugin, TypePath};
 use bevy::utils::{HashMap};
 use thiserror::Error;
 use crate::game::GameStates;
-use crate::game::GameStates::PrepareLoad;
+use crate::game::GameStates::{Loading, PrepareLoad};
 use crate::resource::action::melee::MeleeInfo;
 use crate::resource::action::projectile::ProjectileInfo;
 use crate::unit::UnitInfo;
@@ -23,7 +23,6 @@ impl Plugin for ResourcePlugin {
             .add_plugins((
                 action::ActionPlugin,
             ))
-            .add_event::<ConfigLoaded>()
             .add_systems(Update,
                          (
                              config_res_parse,
@@ -72,7 +71,7 @@ fn config_res_parse(
 fn check_all_config_loaded(
     mut commands: Commands,
     query: Query<(Entity, &ConfigResourceParse)>,
-    mut cfg_event: EventWriter<ConfigLoaded>,
+    mut next_state: ResMut<NextState<GameStates>>,
     state: Res<State<GameStates>>,
 ) {
     info!("check_all_config_loaded {} -- {:?} ", query.iter().count(), state);
@@ -86,16 +85,12 @@ fn check_all_config_loaded(
         }
     }
 
-    cfg_event.send(ConfigLoaded);
-
     for (entity, _) in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
+
+    next_state.set(Loading);
 }
-
-#[derive(Event)]
-pub struct ConfigLoaded;
-
 
 #[derive(Resource, Default)]
 pub struct ConfigResource {

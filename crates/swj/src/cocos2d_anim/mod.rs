@@ -147,50 +147,57 @@ fn spawn_anim(
     query: Query<(Entity, &Cocos2dAnimator), Added<Cocos2dAnimator>>,
 ) {
     for (entity, cfg) in &mut query.iter() {
-        let anim_asset = animations.get(cfg.anim_handle.clone()).unwrap();
-        let anim_name = if let Some(name) = &cfg.new_anim {
-            name.clone()
-        } else {
-            warn!("anim name is empty, nothing to play. Set anim name in Cocos2dAnimator component.");
-            continue;
-        };
-        if anim_name.is_empty() || !anim_asset.animation.contains_key(&anim_name) {
-            commands.entity(entity).despawn();
-            warn!("In {:?} animation, anim {} not found.",cfg.anim_handle, anim_name);
-            continue;
-        }
-
-        let animation = &anim_asset.animation[&anim_name];
-        let interval = if let Some(duration) = cfg.duration {
-            duration.as_secs_f32() / max(animation.frame_size - 1, 1) as f32
-        } else {
-            animation.interval
-        };
-
-        commands.entity(entity).try_insert((
-            Cocos2dAnimatorPlayer {
-                frame_idx: 0,
-                timer: Timer::from_seconds(interval, Repeating),
-                anim_name,
-            },
-        ))
-            .with_children(|parent| {
-                for (name, frames) in &animation.layers {
-                    parent.spawn((
-                        CocoAnim2dAnimatorLayer {
-                            name: name.clone(),
-                            idx: 0,
-                        },
-                        SpriteBundle {
-                            ..default()
-                        },
-                        TextureAtlas {
-                            ..default()
-                        },
-                    ));
-                }
-            });
+        spawn_anim_internal(&mut commands, animations.as_ref(), entity, cfg);
     }
+}
+
+fn spawn_anim_internal(commands: &mut Commands, animations: &Assets<Cocos2dAnimAsset>, entity: Entity, cfg: &Cocos2dAnimator) -> bool {
+    let anim_asset = animations.get(cfg.anim_handle.clone()).unwrap();
+    let anim_name = if let Some(name) = &cfg.new_anim {
+        name.clone()
+    } else {
+        warn!("anim name is empty, nothing to play. Set anim name in Cocos2dAnimator component.");
+        return false;
+    };
+    if anim_name.is_empty() || !anim_asset.animation.contains_key(&anim_name) {
+        commands.entity(entity).despawn();
+        warn!("In {:?} animation, anim {} not found.",cfg.anim_handle, anim_name);
+        return false;
+    }
+
+    let animation = &anim_asset.animation[&anim_name];
+    let interval = if let Some(duration) = cfg.duration {
+        duration.as_secs_f32() / max(animation.frame_size - 1, 1) as f32
+    } else {
+        animation.interval
+    };
+
+    commands.entity(entity).try_insert((
+        Cocos2dAnimatorPlayer {
+            frame_idx: 0,
+            timer: Timer::from_seconds(interval, Repeating),
+            anim_name,
+        },
+    ))
+        .with_children(|parent| {
+            for (name, frames) in &animation.layers {
+                parent.spawn((
+                    CocoAnim2dAnimatorLayer {
+                        name: name.clone(),
+                        idx: 0,
+                    },
+                    SpriteBundle {
+                        ..default()
+                    },
+                    TextureAtlas {
+                        ..default()
+                    },
+                ));
+            }
+        });
+
+
+    true
 }
 
 #[derive(Component)]

@@ -7,6 +7,8 @@ pub mod effect;
 mod resource;
 mod clash;
 
+mod rpg;
+
 pub(crate) enum AnimChannel {
     Unit = 0,
     Projectile,
