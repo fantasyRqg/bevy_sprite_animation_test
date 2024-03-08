@@ -6,7 +6,7 @@ use bevy::{
 };
 use bevy::asset::AsyncReadExt;
 use bevy::math::vec2;
-use bevy::utils::{HashMap, thiserror};
+use bevy::utils::{HashMap};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -67,7 +67,8 @@ pub struct Cocos2dAnimFrame {
 
     pub fi: usize,
 
-    pub sprite_atlas: Handle<TextureAtlas>,
+    pub sprite_atlas: Handle<TextureAtlasLayout>,
+    pub texture: Handle<Image>,
     pub sprite_idx: usize,
 }
 
@@ -353,6 +354,7 @@ impl AssetLoader for Cocos2dAnimAssetLoader {
                             color: frame_data.color,
                             fi: frame_data.fi,
                             sprite_atlas: sprite_sheet.atlas.clone(),
+                            texture: sprite_sheet.texture.clone(),
                             sprite_idx,
                         };
 

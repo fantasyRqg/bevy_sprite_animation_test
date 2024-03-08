@@ -1,3 +1,4 @@
+use bevy::color::palettes::basic::RED;
 use bevy::prelude::*;
 use serde_json::Value;
 use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
@@ -35,7 +36,7 @@ fn debug_projectile(
         gizmos.line_2d(
             to_target.src_pos,
             to_target.dest_pos,
-            Color::RED,
+            RED,
         );
     }
 }
@@ -56,7 +57,7 @@ fn projectile_fly_to_fixed_target(
         let delta_pos = to_target.init_velocity * delta_time + 0.5 * to_target.acceleration * delta_time * delta_time;
         let pos = to_target.src_pos + delta_pos;
 
-        transform.translation = pos.extend(map_info.size.y - pos.y);
+        transform.translation = pos.extend(map_info.size.y - pos.y + 1000.);
         let cur_velocity = to_target.init_velocity + to_target.acceleration * delta_time;
         transform.rotation = Quat::from_rotation_z(cur_velocity.y.atan2(cur_velocity.x));
 
@@ -68,13 +69,16 @@ fn projectile_finish_fly(
     mut commands: Commands,
     mut rm_fly: RemovedComponents<ProjectileFly>,
     mut damage_writer: EventWriter<DamageEvent>,
-    mut query: Query<(Entity, &Projectile, &Transform, &mut Cocos2dAnimator, &ProjectileToFixedTarget), Without<ProjectileFly>>,
+    mut query: Query<(Entity, &Projectile, &mut Transform, &mut Cocos2dAnimator, &ProjectileToFixedTarget), (Without<ProjectileFly>, Without<UnitState>)>,
     unit_query: Query<(&Unit, &Transform), With<UnitState>>,
+    query_all: Query<&Projectile>,
+    map_info: Res<CurrentMapInfo>,
 ) {
+    let projectile_count = query_all.iter().count();
     for entity in rm_fly.read() {
-        if let Ok((entity, projectile, transform, mut animator, fixed_target)) = query.get_mut(entity) {
+        if let Ok((entity, projectile, mut transform, mut animator, fixed_target)) = query.get_mut(entity) {
             let pos = transform.translation.truncate();
-
+            transform.translation.z = map_info.size.y - pos.y;
             match projectile.target {
                 TargetType::Unit(target_entity) => {
                     let unit_pos = if let Ok((unit, unit_transform)) = unit_query.get(target_entity) {
@@ -87,6 +91,11 @@ fn projectile_finish_fly(
                     //     pos, unit_pos, unit_pos.distance(pos), projectile.tolerance, fixed_target.dest_pos);
                     if unit_pos.distance(pos) > projectile.tolerance {
                         //miss
+                        if projectile_count > 2000 {
+                            commands.entity(entity).despawn_recursive();
+                            continue;
+                        }
+
                         animator.new_anim = Some("missEnd".to_string());
                         animator.mode = AnimationMode::Once;
 

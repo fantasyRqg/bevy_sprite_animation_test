@@ -225,7 +225,7 @@ fn update_fps(
     diagnostics: Res<DiagnosticsStore>,
 ) {
     let mut text = query_ui.single_mut();
-    let fps = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS).unwrap();
+    let fps = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS).unwrap();
     if let Some(fps) = fps.smoothed() {
         text.sections[1].value = format!("{:.2}", fps);
     }

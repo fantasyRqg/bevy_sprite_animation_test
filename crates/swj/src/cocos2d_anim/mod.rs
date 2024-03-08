@@ -83,6 +83,7 @@ impl Default for Cocos2dAnimator {
 
 impl Cocos2dAnimator {
     pub fn switch_anim(&mut self, name: &str) {
+        info!("switch_anim: {}", name);
         self.new_anim = Some(name.to_string());
     }
 }
@@ -174,15 +175,18 @@ fn spawn_anim(
             },
         ))
             .with_children(|parent| {
-                for (name, _) in &animation.layers {
+                for (name, frames) in &animation.layers {
                     parent.spawn((
                         CocoAnim2dAnimatorLayer {
                             name: name.clone(),
                             idx: 0,
                         },
-                        SpriteSheetBundle {
+                        SpriteBundle {
                             ..default()
-                        }
+                        },
+                        TextureAtlas {
+                            ..default()
+                        },
                     ));
                 }
             });
@@ -197,11 +201,11 @@ fn animate_sprite(
     time: Res<Time>,
     animations: Res<Assets<Cocos2dAnimAsset>>,
     mut query: Query<(Entity, &mut Cocos2dAnimator, &mut Cocos2dAnimatorPlayer, &Children), Without<AnimEnded>>,
-    mut child_query: Query<(&mut TextureAtlasSprite, &mut CocoAnim2dAnimatorLayer, &mut Handle<TextureAtlas>, &mut Transform)>,
+    mut child_query: Query<(&mut Sprite, &mut Handle<Image>, &mut CocoAnim2dAnimatorLayer, &mut TextureAtlas, &mut Transform)>,
     mut events: EventWriter<AnimEvent>,
 ) {
     for (entity, cfg, mut animator, children) in &mut query {
-        // info!("animate_sprite: {:?}, interval: {}", animator.state, animator.timer.duration().as_secs_f32());
+        // info!("animate_sprite: {:?}, interval: {}", animator, animator.timer.duration().as_secs_f32());
         animator.timer.tick(time.delta());
         if !animator.timer.just_finished() {
             continue;
@@ -252,11 +256,13 @@ fn animate_sprite(
 
         for child in children.iter() {
             let (mut sprite,
+                mut texture,
                 mut layer,
                 mut atlas,
                 mut transform) = match child_query.get_mut(*child) {
                 Ok(v) => v,
                 Err(_) => {
+                    warn!("layer {:?} not found in animation {:?}.", child, cfg.anim_handle);
                     continue;
                 }
             };
@@ -282,13 +288,14 @@ fn animate_sprite(
             }
 
             let frame = &frames[layer.idx];
-            sprite.index = frame.sprite_idx;
+            atlas.index = frame.sprite_idx;
             sprite.color = if let Some(color) = frame.color {
                 color
             } else {
                 Color::WHITE
             };
-            *atlas = frame.sprite_atlas.clone();
+            *texture = frame.texture.clone();
+            atlas.layout = frame.sprite_atlas.clone();
 
             sprite.flip_x = match cfg.face_dir {
                 AnimationFaceDir::Left => true,

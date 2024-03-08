@@ -5,7 +5,6 @@ use bevy::{
     utils::BoxedFuture,
 };
 use bevy::asset::AsyncReadExt;
-use bevy::utils::thiserror;
 use plist::Dictionary;
 use plist::Value;
 use thiserror::Error;
@@ -111,7 +110,8 @@ fn parse_plist(dict: Value) -> (Vec<SpriteFrame>, String, Vec2) {
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct PlistSpriteFrameAsset {
     pub frames: Vec<SpriteFrame>,
-    pub atlas: Handle<TextureAtlas>,
+    pub atlas: Handle<TextureAtlasLayout>,
+    pub texture: Handle<Image>,
 }
 
 #[non_exhaustive]
@@ -138,24 +138,24 @@ impl AssetLoader for PlistSpriteAssetLoader {
             let dict = plist::from_bytes(&bytes).unwrap();
             let (sprite_frames, tex_name, dims) = parse_plist(dict);
             let tex_img = load_context.load(load_context.path().parent().unwrap().join(tex_name));
-            let mut atlas = TextureAtlas::new_empty(tex_img.clone(), dims);
+            let mut atlas = TextureAtlasLayout::new_empty(UVec2::new(dims.x as u32, dims.y as u32));
 
             for sf in sprite_frames.iter().by_ref() {
                 let rect = match sf.rotated {
-                    true => Rect {
-                        min: Vec2::new(sf.frame.0, sf.frame.1),
-                        max: Vec2::new(sf.frame.0 + sf.frame.3, sf.frame.1 + sf.frame.2),
+                    true => URect {
+                        min: UVec2::new(sf.frame.0 as u32, sf.frame.1 as u32),
+                        max: UVec2::new(sf.frame.0 as u32 + sf.frame.3 as u32, sf.frame.1 as u32 + sf.frame.2 as u32),
                     },
-                    false => Rect {
-                        min: Vec2::new(sf.frame.0, sf.frame.1),
-                        max: Vec2::new(sf.frame.0 + sf.frame.2, sf.frame.1 + sf.frame.3),
+                    false => URect {
+                        min: UVec2::new(sf.frame.0 as u32, sf.frame.1 as u32),
+                        max: UVec2::new(sf.frame.0 as u32 + sf.frame.2 as u32, sf.frame.1 as u32 + sf.frame.3 as u32),
                     },
                 };
                 atlas.add_texture(rect);
             }
 
             let atlas_handle = load_context.add_labeled_asset("atlas".to_string(), atlas);
-            Ok(PlistSpriteFrameAsset { frames: sprite_frames, atlas: atlas_handle })
+            Ok(PlistSpriteFrameAsset { frames: sprite_frames, atlas: atlas_handle, texture: tex_img })
         })
     }
 

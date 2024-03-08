@@ -3,6 +3,8 @@
 use bevy::{
     prelude::*,
 };
+use bevy::color::palettes::basic::RED;
+use bevy::color::palettes::css::ANTIQUE_WHITE;
 use bevy::log::LogPlugin;
 use bevy::math::vec2;
 use bevy::ui::AlignItems::Center;
@@ -14,13 +16,13 @@ use swj::cocos2d_anim::sprite_sheet::PlistSpriteFrameAsset;
 
 fn main() {
     App::new()
-        .add_state::<GameStates>()
+        .init_state::<GameStates>()
         .add_plugins(DefaultPlugins
-            .set(ImagePlugin::default_nearest())
-            // .set(LogPlugin {
-            //     level: bevy::log::Level::DEBUG,
-            //     ..default()
-            // })
+                         .set(ImagePlugin::default_nearest())
+                     // .set(LogPlugin {
+                     //     level: bevy::log::Level::DEBUG,
+                     //     ..default()
+                     // })
         )
         .add_plugins(Cocos2dAnimPlugin)
         .init_resource::<AnimDataRes>()
@@ -58,7 +60,7 @@ fn setup(
     mut anim_data: ResMut<AnimDataRes>,
 ) {
     commands.spawn(Camera2dBundle::default());
-    anim_data.anim = asset_server.load("Resources/Animations/ArtillerySupport.ExportJson",);
+    anim_data.anim = asset_server.load("Resources/Animations/archer_soldier.ExportJson");
 }
 
 fn check_load(mut events: EventReader<AssetEvent<Cocos2dAnimAsset>>,
@@ -89,7 +91,7 @@ fn spawn_anim(
         Cocos2dAnimator {
             duration: None,
             anim_handle: anim_data.anim.clone(),
-            new_anim: Some("fly".to_string()),
+            new_anim: Some("born".to_string()),
             mode: AnimationMode::Loop,
             event_channel: Some(0),
             face_dir: AnimationFaceDir::Right,
@@ -133,9 +135,9 @@ fn spawn_anim(
                         margin: UiRect::all(Val::Px(5.0)),
                         ..default()
                     },
-                    background_color: BackgroundColor(Color::ANTIQUE_WHITE),
                     ..default()
                 },
+                BackgroundColor(ANTIQUE_WHITE.into()),
                 AnimButton(name.clone()),
             )).with_children(|parent| {
                 parent.spawn(TextBundle::from_section(
@@ -174,18 +176,18 @@ fn anim_evt(
 
 
 fn debug_plist(
-    texture_atlas: Res<Assets<TextureAtlas>>,
+    texture_atlas: Res<Assets<TextureAtlasLayout>>,
     sprite_sheet: Res<Assets<PlistSpriteFrameAsset>>,
     animation: Res<Assets<Cocos2dAnimAsset>>,
 ) {
-    // for atlas in texture_atlas.iter() {
-    //     info!("Atlas: {:?}", atlas.1.texture);
-    // }
-    //
+    for atlas in texture_atlas.iter() {
+        // info!("Atlas: {:?}", atlas.1.layout);
+    }
+
     // for sheet in sprite_sheet.iter() {
     //     info!("Sheet: {:?}", sheet.0);
     // }
-
+    //
     // for anim in animation.iter() {
     //     info!("Anim: {:?}", anim);
     // }
@@ -194,8 +196,8 @@ fn debug_plist(
 fn debug_anchor(
     mut gizmos: Gizmos,
 ) {
-    gizmos.line_2d(vec2(-10.0, 0.0), vec2(10.0, 0.0), Color::RED);
-    gizmos.line_2d(vec2(0.0, -10.0), vec2(0.0, 10.0), Color::RED);
+    gizmos.line_2d(vec2(-10.0, 0.0), vec2(10.0, 0.0), RED);
+    gizmos.line_2d(vec2(0.0, -10.0), vec2(0.0, 10.0), RED);
 }
 
 

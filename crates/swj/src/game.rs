@@ -1,4 +1,5 @@
 use bevy::app::App;
+use bevy::color::palettes::basic::RED;
 use bevy::math::vec2;
 use bevy::prelude::*;
 
@@ -24,7 +25,7 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_state::<GameStates>()
+        app.init_state::<GameStates>()
             .add_plugins((
                 Cocos2dAnimPlugin,
                 // PfControllerPlugin,
@@ -46,7 +47,7 @@ impl Plugin for GamePlugin {
 
 fn setup(mut commands: Commands,
          _asset_server: Res<AssetServer>,
-         _texture_atlases: ResMut<Assets<TextureAtlas>>,
+         _texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     commands.spawn(Camera2dBundle {
         projection: OrthographicProjection {
@@ -62,6 +63,6 @@ fn debug_pos(
     mut gizmos: Gizmos
 ) {
     let x_offset = 100.0;
-    gizmos.rect_2d(vec2(-x_offset / 2.0, 1126.0 / 2.0 - 80.), 0., vec2(x_offset, 500.0), Color::RED);
-    gizmos.rect_2d(vec2(4672.0 + x_offset / 2.0, 1126.0 / 2.0), 0., vec2(x_offset, 600.0), Color::RED);
+    gizmos.rect_2d(vec2(-x_offset / 2.0, 1126.0 / 2.0 - 80.), 0., vec2(x_offset, 500.0), RED);
+    gizmos.rect_2d(vec2(4672.0 + x_offset / 2.0, 1126.0 / 2.0), 0., vec2(x_offset, 600.0), RED);
 }

@@ -12,7 +12,6 @@ use crate::game::GameStates;
 use crate::game::GameStates::{Loading, Playing, PrepareLoad, PrepareScene};
 use crate::map::{TmxMap, TmxMapAsset};
 use crate::resource::{ConfigLoaded, ConfigResource, ResourcePath};
-use crate::sprite_debug::SpriteDebugPlugin;
 use crate::unit::{get_unit_resources, UnitAnimName, UnitBundle, UnitTeamLeft, UnitTeamRight};
 
 pub struct ClashPlugin;
@@ -240,8 +239,8 @@ impl Default for UnitGenRes {
 
         UnitGenRes {
             timer: Timer::from_seconds(0.2, Repeating),
-            left_gen_speed: 5,
-            right_gen_speed: 5,
+            left_gen_speed: 8,
+            right_gen_speed: 8,
             left_gen_rect: Rect::new(left_centre.x - left_size.x / 2.0, left_centre.y - left_size.y / 2.0, left_centre.x + left_size.x / 2.0, left_centre.y + left_size.y / 2.0),
             right_gen_rect: Rect::new(right_centre.x - right_size.x / 2.0, right_centre.y - right_size.y / 2.0, right_centre.x + right_size.x / 2.0, right_centre.y + right_size.y / 2.0),
         }

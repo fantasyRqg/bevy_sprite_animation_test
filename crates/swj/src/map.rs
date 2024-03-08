@@ -9,11 +9,10 @@ use bevy::input::mouse::MouseWheel;
 use bevy::input::touch::TouchPhase;
 use bevy::input::touchpad::TouchpadMagnify;
 use bevy::math::vec2;
-use bevy::prelude::shape::Quad;
 use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::texture::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::sprite::Anchor;
-use bevy::utils::{HashMap, thiserror};
+use bevy::utils::HashMap;
 use serde_xml::value::{Content, Element};
 use thiserror::Error;
 
@@ -230,8 +229,6 @@ fn map_system(
     mut commands: Commands,
     tmx_map_asset: Res<Assets<TmxMapAsset>>,
     query: Query<&TmxMap, Added<TmxMap>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut current_map_info: ResMut<CurrentMapInfo>,
     textures: ResMut<Assets<Image>>,
 ) {
@@ -250,26 +247,26 @@ fn map_system(
             });
         }
 
-        let mut mesh: Mesh = Quad::new(Vec2::new(tmx_map.width, tmx_map.height)).into();
         current_map_info.size = Vec2::new(tmx_map.width, tmx_map.height);
 
-        let bg_image = textures.get(&tmx_map.background).unwrap();
 
-        if let Some(VertexAttributeValues::Float32x2(uvs)) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
-            for uv in uvs.iter_mut() {
-                uv[0] *= tmx_map.width / bg_image.width() as f32;
-                uv[1] *= tmx_map.height / bg_image.height() as f32;
-            }
-        }
-
-        let material = materials.add(ColorMaterial::from(tmx_map.background.clone()));
-
-        commands.spawn(ColorMesh2dBundle {
-            mesh: meshes.add(mesh).into(),
-            transform: Transform::from_translation(Vec3::new(tmx_map.width / 2.0, tmx_map.height / 2.0, 0.0)),
-            material,
-            ..Default::default()
-        }).insert(TmxMapBg(Vec2::new(tmx_map.width, tmx_map.height)));
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Vec2::new(tmx_map.width, tmx_map.height).into(),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(tmx_map.width / 2.0, tmx_map.height / 2.0, 0.0)),
+                texture: tmx_map.background.clone(),
+                ..default()
+            },
+            ImageScaleMode::Tiled {
+                tile_x: true,
+                tile_y: true,
+                stretch_value: 1.0,
+            },
+            TmxMapBg(Vec2::new(tmx_map.width, tmx_map.height))
+        ));
     }
 }
 

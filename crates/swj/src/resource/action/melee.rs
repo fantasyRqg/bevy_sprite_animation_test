@@ -1,12 +1,10 @@
 use bevy::prelude::*;
-use rand::Rng;
 use serde_json::Value;
 
 use crate::cocos2d_anim::anim::Cocos2dAnimAsset;
 use crate::game::GameStates::PrepareLoad;
 use crate::resource::{ConfigResource, ConfigResourceParse};
-use crate::resource::action::DamageEvent;
-use crate::unit::{UnitDamage, UnitType};
+use crate::unit::UnitType;
 
 pub struct MeleePlugin;
 
